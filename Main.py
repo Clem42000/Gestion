@@ -9,125 +9,80 @@ import hashlib
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Gestion Dépenses Boursobank",
+    page_title="Gestion Dépenses",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ========================================
-# SYSTÈME D'AUTHENTIFICATION SIMPLE
-# ========================================
-
-def hash_password(password):
-    """Hash un mot de passe"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def check_password():
-    """Vérifie le mot de passe"""
-    
-    # ⚠️ CHANGEZ CE MOT DE PASSE !
-    # Pour générer un nouveau hash, exécutez en Python :
-    # import hashlib
-    # print(hashlib.sha256("VOTRE_MOT_DE_PASSE".encode()).hexdigest())
-    
-    STORED_PASSWORD_HASH = "73efb19f64603709eb977b600173843d3c779f7b971304bd28ca13142fbf6009"  # Hash de "password"
-    
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-    
-    if not st.session_state.authenticated:
-        st.markdown("# 🔐 Accès sécurisé")
-        st.markdown("### Gestionnaire de Dépenses Boursobank")
-        
-        st.markdown("""
-        <div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0;'>
-            ⚠️ <strong>Première utilisation ?</strong><br>
-            Le mot de passe par défaut est : <code>password</code><br>
-            Changez-le immédiatement dans le code (voir instructions dans Main.py)
-        </div>
-        """, unsafe_allow_html=True)
-        
-        password = st.text_input("Mot de passe", type="password", key="password_input")
-        
-        # Mode debug
-        if st.checkbox("🔍 Mode debug", key="debug_mode"):
-            if password:
-                input_hash = hash_password(password)
-                st.code(f"Hash entré: {input_hash}")
-                st.code(f"Hash stocké: {STORED_PASSWORD_HASH}")
-                st.write(f"Match: {input_hash == STORED_PASSWORD_HASH}")
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("🔓 Se connecter", type="primary", use_container_width=True):
-                if password:
-                    input_hash = hash_password(password)
-                    if input_hash == STORED_PASSWORD_HASH:
-                        st.session_state.authenticated = True
-                        st.rerun()
-                    else:
-                        st.error("❌ Mot de passe incorrect")
-                else:
-                    st.warning("⚠️ Veuillez entrer un mot de passe")
-        
-        st.stop()
-
-# Vérifier l'authentification au démarrage
-check_password()
-
-# CSS personnalisé pour un design moderne compatible mode sombre
+# CSS personnalisé
 st.markdown("""
 <style>
-    /* Métriques avec bon contraste */
     .stMetric {
         background-color: var(--secondary-background-color);
-        padding: 15px;
-        border-radius: 10px;
+        padding: 20px;
+        border-radius: 12px;
         border: 1px solid var(--border-color);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
-    /* Amélioration des cartes métriques */
     [data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
+        font-size: 2rem !important;
         font-weight: 600 !important;
     }
     
-    /* Boîtes de messages - utiliser les variables Streamlit */
-    .success-box {
-        background-color: rgba(16, 185, 129, 0.1);
-        color: var(--text-color);
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 4px solid #10b981;
-        margin: 10px 0;
+    .login-container {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 40px;
+        background-color: var(--secondary-background-color);
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .warning-box {
-        background-color: rgba(245, 158, 11, 0.1);
-        color: var(--text-color);
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 4px solid #f59e0b;
-        margin: 10px 0;
-    }
+    
     .info-box {
         background-color: rgba(59, 130, 246, 0.1);
-        color: var(--text-color);
-        padding: 15px;
-        border-radius: 10px;
+        padding: 16px;
+        border-radius: 8px;
         border-left: 4px solid #3b82f6;
-        margin: 10px 0;
+        margin: 16px 0;
     }
     
-    /* Graphiques */
-    .js-plotly-plot {
-        border-radius: 10px;
+    .warning-box {
+        background-color: rgba(245, 158, 11, 0.1);
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 4px solid #f59e0b;
+        margin: 16px 0;
     }
     
-    /* Expanders */
+    .success-box {
+        background-color: rgba(16, 185, 129, 0.1);
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 4px solid #10b981;
+        margin: 16px 0;
+    }
+    
+    .month-selector {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background-color: var(--background-color);
+        padding: 16px 0;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 24px;
+    }
+    
+    h1, h2, h3 {
+        font-weight: 600;
+    }
+    
     .streamlit-expanderHeader {
         background-color: var(--secondary-background-color);
-        border-radius: 5px;
+        border-radius: 8px;
+        font-weight: 500;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -137,11 +92,63 @@ RULES_FILE = "categorization_rules.json"
 TRANSACTIONS_FILE = "all_transactions.csv"
 
 # ========================================
+# AUTHENTIFICATION
+# ========================================
+
+def hash_password(password):
+    """Hash un mot de passe avec SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def check_password():
+    """Système d'authentification"""
+    
+    # Hash du mot de passe (défaut: "password")
+    # Pour changer: print(hashlib.sha256("VOTRE_MDP".encode()).hexdigest())
+    STORED_PASSWORD_HASH = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"
+    
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            st.markdown("<div class='login-container'>", unsafe_allow_html=True)
+            
+            st.markdown("### Gestionnaire de Finances")
+            st.markdown("Accès sécurisé")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            password = st.text_input(
+                "Mot de passe",
+                type="password",
+                key="password_input",
+                label_visibility="collapsed",
+                placeholder="Entrez votre mot de passe"
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("Se connecter", type="primary", use_container_width=True):
+                if password and hash_password(password) == STORED_PASSWORD_HASH:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Mot de passe incorrect")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.stop()
+
+check_password()
+
+# ========================================
 # FONCTIONS UTILITAIRES
 # ========================================
 
 def load_rules():
-    """Charge les règles de catégorisation depuis le fichier JSON"""
+    """Charge les règles de catégorisation"""
     if os.path.exists(RULES_FILE):
         try:
             with open(RULES_FILE, 'r', encoding='utf-8') as f:
@@ -151,12 +158,12 @@ def load_rules():
     return []
 
 def save_rules():
-    """Sauvegarde les règles de catégorisation"""
+    """Sauvegarde les règles"""
     with open(RULES_FILE, 'w', encoding='utf-8') as f:
         json.dump(st.session_state.rules, f, ensure_ascii=False, indent=2)
 
 def load_transactions():
-    """Charge toutes les transactions depuis le fichier CSV"""
+    """Charge toutes les transactions"""
     if os.path.exists(TRANSACTIONS_FILE):
         try:
             return pd.read_csv(TRANSACTIONS_FILE, sep=';')
@@ -165,11 +172,11 @@ def load_transactions():
     return pd.DataFrame()
 
 def save_transactions():
-    """Sauvegarde toutes les transactions"""
+    """Sauvegarde les transactions"""
     st.session_state.all_transactions.to_csv(TRANSACTIONS_FILE, sep=';', index=False)
 
 def categorize_transaction(row, rules):
-    """Applique les règles de catégorisation à une transaction"""
+    """Applique les règles de catégorisation"""
     if hasattr(row, 'get'):
         label = str(row.get('label', ''))
         category_parent = str(row.get('categoryParent', ''))
@@ -183,12 +190,12 @@ def categorize_transaction(row, rules):
     category_parent_lower = category_parent.lower()
     category_lower = category.lower()
     
-    # Détecter les mouvements internes
+    # Détecter mouvements internes
     if 'mouvements internes' in category_parent_lower or 'mouvements internes' in category_lower:
-        return '💰 Mouvement interne'
+        return 'Mouvement interne'
     
     if 'virements reçus de comptes à comptes' in category_lower or 'virements émis de comptes à comptes' in category_lower:
-        return '💰 Mouvement interne'
+        return 'Mouvement interne'
     
     internal_keywords = [
         'virement depuis livret a',
@@ -197,9 +204,9 @@ def categorize_transaction(row, rules):
         'vir virement depuis boursobank'
     ]
     if any(keyword in label_lower for keyword in internal_keywords):
-        return '💰 Mouvement interne'
+        return 'Mouvement interne'
     
-    # Appliquer les règles personnalisées
+    # Règles personnalisées
     for rule in rules:
         if rule['keyword'].lower() in label_lower:
             return rule['category']
@@ -207,7 +214,7 @@ def categorize_transaction(row, rules):
     return 'Non catégorisé'
 
 def parse_csv(uploaded_file):
-    """Parse le fichier CSV de Boursobank"""
+    """Parse le CSV de Boursobank"""
     try:
         df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8')
         
@@ -224,11 +231,11 @@ def parse_csv(uploaded_file):
         
         return df
     except Exception as e:
-        st.error(f"❌ Erreur lors de la lecture du CSV : {e}")
+        st.error(f"Erreur lors de la lecture du CSV : {e}")
         return None
 
 def recategorize_all():
-    """Recatégorise toutes les transactions avec les règles actuelles"""
+    """Recatégorise toutes les transactions"""
     if not st.session_state.all_transactions.empty:
         st.session_state.all_transactions['autoCategory'] = st.session_state.all_transactions.apply(
             lambda row: categorize_transaction(row, st.session_state.rules), axis=1
@@ -236,7 +243,7 @@ def recategorize_all():
         save_transactions()
 
 def calculate_stats(df, selected_month=None):
-    """Calcule les statistiques pour le mois sélectionné"""
+    """Calcule les statistiques"""
     if df.empty:
         return {
             'total_expenses': 0,
@@ -245,18 +252,23 @@ def calculate_stats(df, selected_month=None):
             'by_category': {},
             'savings_in': 0,
             'savings_out': 0,
-            'net_savings': 0
+            'net_savings': 0,
+            'avg_daily_expense': 0,
+            'largest_expense': {'label': '', 'amount': 0},
+            'expense_count': 0
         }
     
     if selected_month and selected_month != "Tous les mois":
         df = df[df['dateOp'].str.startswith(selected_month)]
     
-    internal = df[df['autoCategory'] == '💰 Mouvement interne']
+    # Mouvements internes
+    internal = df[df['autoCategory'] == 'Mouvement interne']
     savings_in = abs(internal[internal['amount'] < 0]['amount'].sum())
     savings_out = internal[internal['amount'] > 0]['amount'].sum()
     net_savings = savings_in - savings_out
     
-    df_filtered = df[df['autoCategory'] != '💰 Mouvement interne']
+    # Revenus et dépenses (hors mouvements internes)
+    df_filtered = df[df['autoCategory'] != 'Mouvement interne']
     
     expenses = df_filtered[df_filtered['amount'] < 0].copy()
     income = df_filtered[df_filtered['amount'] > 0].copy()
@@ -264,8 +276,29 @@ def calculate_stats(df, selected_month=None):
     total_expenses = abs(expenses['amount'].sum())
     total_income = income['amount'].sum()
     
+    # Par catégorie
     expenses['category_final'] = expenses['autoCategory'].fillna(expenses['category'])
     by_category = expenses.groupby('category_final')['amount'].sum().abs().to_dict()
+    
+    # Statistiques supplémentaires
+    expense_count = len(expenses)
+    
+    # Dépense moyenne par jour
+    if not expenses.empty and selected_month and selected_month != "Tous les mois":
+        days_in_month = pd.to_datetime(expenses['dateOp']).dt.day.max()
+        avg_daily_expense = total_expenses / days_in_month if days_in_month > 0 else 0
+    else:
+        avg_daily_expense = 0
+    
+    # Plus grosse dépense
+    if not expenses.empty:
+        largest_idx = expenses['amount'].abs().idxmax()
+        largest_expense = {
+            'label': expenses.loc[largest_idx, 'label'],
+            'amount': abs(expenses.loc[largest_idx, 'amount'])
+        }
+    else:
+        largest_expense = {'label': '', 'amount': 0}
     
     return {
         'total_expenses': total_expenses,
@@ -274,11 +307,14 @@ def calculate_stats(df, selected_month=None):
         'by_category': by_category,
         'savings_in': savings_in,
         'savings_out': savings_out,
-        'net_savings': net_savings
+        'net_savings': net_savings,
+        'avg_daily_expense': avg_daily_expense,
+        'largest_expense': largest_expense,
+        'expense_count': expense_count
     }
 
 def get_month_comparison(df):
-    """Compare les statistiques entre les mois"""
+    """Compare les statistiques entre mois"""
     if df.empty:
         return pd.DataFrame()
     
@@ -299,7 +335,7 @@ def get_month_comparison(df):
     return pd.DataFrame(monthly_stats)
 
 def export_to_excel():
-    """Exporte les données vers Excel"""
+    """Exporte vers Excel"""
     if st.session_state.all_transactions.empty:
         return None
     
@@ -317,65 +353,102 @@ def export_to_excel():
     
     return output_file
 
+def get_budget_alerts(stats, budgets):
+    """Génère des alertes de budget"""
+    alerts = []
+    for category, limit in budgets.items():
+        if category in stats['by_category']:
+            spent = stats['by_category'][category]
+            percentage = (spent / limit) * 100
+            if percentage >= 100:
+                alerts.append({
+                    'category': category,
+                    'spent': spent,
+                    'limit': limit,
+                    'status': 'danger',
+                    'message': f"Budget dépassé de {spent - limit:.2f} €"
+                })
+            elif percentage >= 80:
+                alerts.append({
+                    'category': category,
+                    'spent': spent,
+                    'limit': limit,
+                    'status': 'warning',
+                    'message': f"{percentage:.0f}% du budget utilisé"
+                })
+    return alerts
+
 # ========================================
-# INITIALISATION DU SESSION STATE
+# INITIALISATION
 # ========================================
 
 if 'rules' not in st.session_state:
     st.session_state.rules = load_rules()
 if 'all_transactions' not in st.session_state:
     st.session_state.all_transactions = load_transactions()
-if 'show_debug' not in st.session_state:
-    st.session_state.show_debug = False
+if 'budgets' not in st.session_state:
+    st.session_state.budgets = {}
+if 'selected_month' not in st.session_state:
+    st.session_state.selected_month = "Tous les mois"
 
 # ========================================
-# INTERFACE UTILISATEUR
+# HEADER & NAVIGATION
 # ========================================
 
-# Header avec logo et titre
-col1, col2 = st.columns([1, 5])
-with col1:
-    st.markdown("# 💰")
-with col2:
-    st.title("Gestionnaire de Dépenses Boursobank")
-    st.caption("Suivez vos finances personnelles mois par mois")
+# Titre principal
+st.title("Gestionnaire de Finances")
 
-st.markdown("---")
+# Sélecteur de mois en haut (sticky)
+if not st.session_state.all_transactions.empty:
+    st.markdown("<div class='month-selector'>", unsafe_allow_html=True)
+    
+    available_months = sorted(
+        st.session_state.all_transactions['dateOp'].str[:7].unique(),
+        reverse=True
+    )
+    
+    col1, col2, col3 = st.columns([2, 3, 2])
+    with col2:
+        selected_month = st.selectbox(
+            "Période",
+            ["Tous les mois"] + list(available_months),
+            format_func=lambda x: x if x == "Tous les mois" else datetime.strptime(x, "%Y-%m").strftime("%B %Y"),
+            key="month_selector",
+            label_visibility="collapsed"
+        )
+        st.session_state.selected_month = selected_month
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.markdown("## 📍 Navigation")
+    st.markdown("## Navigation")
     page = st.radio(
         "",
-        ["📊 Tableau de bord", "📈 Évolution", "📤 Import CSV", "⚙️ Règles", "📋 Transactions"],
+        ["Tableau de bord", "Évolution", "Transactions", "Catégories", "Budgets", "Import CSV"],
         label_visibility="collapsed"
     )
     
     st.markdown("---")
     
-    st.markdown("## 📈 Statistiques")
     if not st.session_state.all_transactions.empty:
+        st.markdown("## Statistiques globales")
         total_trans = len(st.session_state.all_transactions)
         total_rules = len(st.session_state.rules)
-        
-        st.metric("📝 Transactions", total_trans)
-        st.metric("⚙️ Règles actives", total_rules)
-        
         months = st.session_state.all_transactions['dateOp'].str[:7].nunique()
-        st.metric("📅 Mois enregistrés", months)
-    else:
-        st.info("💡 Importez vos transactions pour commencer")
-    
-    st.markdown("---")
-    
-    # Export Excel
-    if not st.session_state.all_transactions.empty:
-        if st.button("📥 Exporter vers Excel", use_container_width=True):
+        
+        st.metric("Transactions", total_trans)
+        st.metric("Règles actives", total_rules)
+        st.metric("Mois", months)
+        
+        st.markdown("---")
+        
+        if st.button("Exporter Excel", use_container_width=True):
             excel_file = export_to_excel()
             if excel_file:
                 with open(excel_file, 'rb') as f:
                     st.download_button(
-                        "⬇️ Télécharger Excel",
+                        "Télécharger",
                         f,
                         file_name=excel_file,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -383,193 +456,171 @@ with st.sidebar:
                     )
     
     st.markdown("---")
-    st.markdown("### 🔧 Options")
-    st.session_state.show_debug = st.checkbox("Mode debug", value=st.session_state.show_debug)
+    if st.button("Déconnexion", type="secondary", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # ========================================
 # PAGE: TABLEAU DE BORD
 # ========================================
-if page == "📊 Tableau de bord":
-    st.header("📊 Tableau de bord financier")
+if page == "Tableau de bord":
     
     if st.session_state.all_transactions.empty:
-        st.warning("⚠️ Aucune transaction chargée. Importez un fichier CSV pour commencer.")
-        st.info("👉 Rendez-vous dans la section **📤 Import CSV** pour importer vos données.")
+        st.info("Aucune transaction chargée. Importez un fichier CSV pour commencer.")
     else:
         df = st.session_state.all_transactions
+        stats = calculate_stats(df, st.session_state.selected_month if st.session_state.selected_month != "Tous les mois" else None)
         
-        # Sélection du mois
-        available_months = sorted(df['dateOp'].str[:7].unique(), reverse=True)
-        
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            selected_month = st.selectbox(
-                "📅 Période",
-                ["Tous les mois"] + list(available_months),
-                format_func=lambda x: x if x == "Tous les mois" else datetime.strptime(x, "%Y-%m").strftime("%B %Y")
-            )
-        
-        stats = calculate_stats(df, selected_month if selected_month != "Tous les mois" else None)
-        
-        # Cartes de statistiques principales
-        st.markdown("### 💵 Vue d'ensemble")
+        # Indicateurs clés
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(
-                "💰 Revenus",
-                f"{stats['total_income']:.2f} €",
-                help="Total des revenus (hors mouvements internes)"
-            )
+            st.metric("Revenus", f"{stats['total_income']:.2f} €")
         
         with col2:
             st.metric(
-                "💸 Dépenses",
+                "Dépenses",
                 f"{stats['total_expenses']:.2f} €",
-                delta=f"-{stats['total_expenses']:.2f} €" if stats['total_expenses'] > 0 else None,
-                delta_color="inverse",
-                help="Total des dépenses (hors mouvements internes)"
+                delta=f"-{stats['total_expenses']:.2f} €",
+                delta_color="inverse"
             )
         
         with col3:
             balance = stats['balance']
             st.metric(
-                "💵 Solde",
+                "Solde",
                 f"{balance:.2f} €",
                 delta=f"{balance:.2f} €",
-                delta_color="normal" if balance >= 0 else "inverse",
-                help="Revenus - Dépenses"
+                delta_color="normal" if balance >= 0 else "inverse"
             )
         
         with col4:
-            net_savings = stats['net_savings']
             st.metric(
-                "🏦 Épargne",
-                f"{net_savings:.2f} €",
-                delta=f"{net_savings:.2f} €",
-                delta_color="normal" if net_savings >= 0 else "inverse",
-                help="Évolution nette de votre épargne"
+                "Épargne",
+                f"{stats['net_savings']:.2f} €",
+                delta=f"{stats['net_savings']:.2f} €",
+                delta_color="normal" if stats['net_savings'] >= 0 else "inverse"
             )
         
-        # Détails épargne
-        if stats['savings_in'] > 0 or stats['savings_out'] > 0:
-            st.markdown("---")
-            st.markdown("### 💰 Détails des mouvements d'épargne")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    "➡️ Versé sur livret A",
-                    f"{stats['savings_in']:.2f} €",
-                    help="Montant transféré vers votre épargne"
-                )
-            
-            with col2:
-                st.metric(
-                    "⬅️ Retiré du livret A",
-                    f"{stats['savings_out']:.2f} €",
-                    help="Montant retiré de votre épargne"
-                )
-            
-            with col3:
-                savings_rate = (net_savings / stats['total_income'] * 100) if stats['total_income'] > 0 else 0
-                st.metric(
-                    "📊 Taux d'épargne",
-                    f"{savings_rate:.1f}%",
-                    help="Pourcentage de vos revenus épargnés"
-                )
-        
+        # Statistiques secondaires
         st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if stats['avg_daily_expense'] > 0:
+                st.metric("Dépense moyenne / jour", f"{stats['avg_daily_expense']:.2f} €")
+            else:
+                st.metric("Nombre de dépenses", stats['expense_count'])
+        
+        with col2:
+            if stats['total_income'] > 0:
+                savings_rate = (stats['net_savings'] / stats['total_income'] * 100)
+                st.metric("Taux d'épargne", f"{savings_rate:.1f}%")
+            else:
+                st.metric("Taux d'épargne", "0%")
+        
+        with col3:
+            if stats['largest_expense']['amount'] > 0:
+                st.metric("Plus grosse dépense", f"{stats['largest_expense']['amount']:.2f} €")
+        
+        # Alertes budgets
+        if st.session_state.budgets:
+            alerts = get_budget_alerts(stats, st.session_state.budgets)
+            if alerts:
+                st.markdown("---")
+                st.markdown("### Alertes budget")
+                for alert in alerts:
+                    if alert['status'] == 'danger':
+                        st.markdown(f"""
+                        <div class="warning-box">
+                            <strong>{alert['category']}</strong> : {alert['message']}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    elif alert['status'] == 'warning':
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <strong>{alert['category']}</strong> : {alert['message']}
+                        </div>
+                        """, unsafe_allow_html=True)
         
         # Graphiques
         if stats['by_category']:
+            st.markdown("---")
+            st.markdown("### Répartition des dépenses")
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("### 📊 Dépenses par catégorie")
                 cat_df = pd.DataFrame(list(stats['by_category'].items()), columns=['Catégorie', 'Montant'])
                 cat_df = cat_df.sort_values('Montant', ascending=False).head(10)
                 
                 fig_bar = px.bar(
                     cat_df,
-                    x='Montant',
                     y='Catégorie',
+                    x='Montant',
                     orientation='h',
                     color='Montant',
-                    color_continuous_scale='Reds',
-                    text='Montant'
+                    color_continuous_scale='Reds'
                 )
-                fig_bar.update_traces(texttemplate='%{text:.2f}€', textposition='outside')
                 fig_bar.update_layout(
                     showlegend=False,
                     height=400,
                     xaxis_title="Montant (€)",
                     yaxis_title="",
                     plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)'
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=0, r=0, t=0, b=0)
                 )
                 st.plotly_chart(fig_bar, use_container_width=True)
             
             with col2:
-                st.markdown("### 🥧 Répartition")
                 fig_pie = px.pie(
                     cat_df,
                     values='Montant',
                     names='Catégorie',
-                    hole=0.4,
-                    color_discrete_sequence=px.colors.sequential.RdBu
+                    hole=0.5
                 )
-                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
                 fig_pie.update_layout(
                     height=400,
-                    showlegend=False,
-                    paper_bgcolor='rgba(0,0,0,0)'
+                    showlegend=True,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=0, r=0, t=0, b=0)
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
             
             # Tableau détaillé
-            st.markdown("### 📋 Détails par catégorie")
+            st.markdown("### Détails par catégorie")
             cat_df_full = pd.DataFrame(list(stats['by_category'].items()), columns=['Catégorie', 'Montant'])
             cat_df_full = cat_df_full.sort_values('Montant', ascending=False)
             cat_df_full['Pourcentage'] = (cat_df_full['Montant'] / cat_df_full['Montant'].sum() * 100).round(1)
-            cat_df_full['Montant formaté'] = cat_df_full['Montant'].apply(lambda x: f"{x:.2f} €")
-            cat_df_full['Pourcentage formaté'] = cat_df_full['Pourcentage'].apply(lambda x: f"{x}%")
             
-            st.dataframe(
-                cat_df_full[['Catégorie', 'Montant formaté', 'Pourcentage formaté']].rename(columns={
-                    'Montant formaté': 'Montant',
-                    'Pourcentage formaté': 'Pourcentage'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-        
-        # Mode debug
-        if st.session_state.show_debug:
-            st.markdown("---")
-            st.markdown("### 🔍 Mode Debug")
+            # Ajouter le budget si défini
+            if st.session_state.budgets:
+                cat_df_full['Budget'] = cat_df_full['Catégorie'].map(st.session_state.budgets)
+                cat_df_full['Reste'] = cat_df_full.apply(
+                    lambda row: row['Budget'] - row['Montant'] if pd.notna(row['Budget']) else None,
+                    axis=1
+                )
             
-            internal_trans = df[df['autoCategory'] == '💰 Mouvement interne']
+            cat_df_full['Montant'] = cat_df_full['Montant'].apply(lambda x: f"{x:.2f} €")
+            cat_df_full['Pourcentage'] = cat_df_full['Pourcentage'].apply(lambda x: f"{x}%")
             
-            if selected_month != "Tous les mois":
-                internal_trans = internal_trans[internal_trans['dateOp'].str.startswith(selected_month)]
+            display_cols = ['Catégorie', 'Montant', 'Pourcentage']
+            if 'Budget' in cat_df_full.columns:
+                cat_df_full['Budget'] = cat_df_full['Budget'].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "-")
+                cat_df_full['Reste'] = cat_df_full['Reste'].apply(lambda x: f"{x:.2f} €" if pd.notna(x) else "-")
+                display_cols.extend(['Budget', 'Reste'])
             
-            if not internal_trans.empty:
-                st.success(f"✅ {len(internal_trans)} mouvements internes détectés")
-                with st.expander("Voir les détails"):
-                    debug_df = internal_trans[['dateOp', 'label', 'categoryParent', 'category', 'amount']].copy()
-                    st.dataframe(debug_df, use_container_width=True)
-            else:
-                st.warning("⚠️ Aucun mouvement interne détecté pour cette période")
+            st.dataframe(cat_df_full[display_cols], use_container_width=True, hide_index=True)
 
 # ========================================
 # PAGE: ÉVOLUTION
 # ========================================
-elif page == "📈 Évolution":
-    st.header("📈 Évolution mensuelle")
+elif page == "Évolution":
+    st.header("Évolution mensuelle")
     
     if st.session_state.all_transactions.empty:
-        st.warning("⚠️ Aucune transaction chargée.")
+        st.info("Aucune transaction chargée.")
     else:
         monthly_data = get_month_comparison(st.session_state.all_transactions)
         
@@ -605,19 +656,19 @@ elif page == "📈 Évolution":
             ))
             
             fig.update_layout(
-                title="Évolution des finances",
-                xaxis_title="Mois",
-                yaxis_title="Montant (€)",
                 height=500,
                 hovermode='x unified',
-                plot_bgcolor='white',
-                paper_bgcolor='rgba(0,0,0,0)'
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                xaxis_title="",
+                yaxis_title="Montant (€)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             
             st.plotly_chart(fig, use_container_width=True)
             
             # Tableau comparatif
-            st.markdown("### 📊 Tableau comparatif")
+            st.markdown("### Tableau comparatif")
             display_monthly = monthly_data.copy()
             for col in ['Revenus', 'Dépenses', 'Solde', 'Épargne']:
                 display_monthly[col] = display_monthly[col].apply(lambda x: f"{x:.2f} €")
@@ -629,231 +680,13 @@ elif page == "📈 Évolution":
             )
 
 # ========================================
-# PAGE: IMPORT CSV
-# ========================================
-elif page == "📤 Import CSV":
-    st.header("📤 Importer vos transactions")
-    
-    st.markdown("""
-    <div class="info-box">
-        <h4>📝 Instructions</h4>
-        <ol>
-            <li>Connectez-vous à votre compte Boursobank</li>
-            <li>Exportez vos transactions au format CSV</li>
-            <li>Sélectionnez le fichier ci-dessous</li>
-            <li>Les transactions seront automatiquement catégorisées</li>
-        </ol>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    uploaded_file = st.file_uploader(
-        "Choisissez votre fichier CSV",
-        type=['csv'],
-        help="Format attendu : export CSV de Boursobank"
-    )
-    
-    if uploaded_file is not None:
-        new_df = parse_csv(uploaded_file)
-        
-        if new_df is not None:
-            st.markdown(f"""
-            <div class="success-box">
-                ✅ <strong>{len(new_df)} transactions</strong> trouvées dans le fichier
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Aperçu
-            st.markdown("### 👀 Aperçu des données")
-            preview_df = new_df[['dateOp', 'label', 'autoCategory', 'amount']].head(10)
-            preview_df.columns = ['Date', 'Libellé', 'Catégorie', 'Montant']
-            st.dataframe(preview_df, use_container_width=True, hide_index=True)
-            
-            # Statistiques de l'import
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Transactions", len(new_df))
-            with col2:
-                uncategorized = len(new_df[new_df['autoCategory'] == 'Non catégorisé'])
-                st.metric("Non catégorisées", uncategorized)
-            with col3:
-                internal = len(new_df[new_df['autoCategory'] == '💰 Mouvement interne'])
-                st.metric("Mouvements internes", internal)
-            
-            # Bouton d'import
-            st.markdown("---")
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if st.button("✅ Confirmer l'import", type="primary", use_container_width=True):
-                    if st.session_state.all_transactions.empty:
-                        st.session_state.all_transactions = new_df
-                    else:
-                        st.session_state.all_transactions = pd.concat(
-                            [st.session_state.all_transactions, new_df],
-                            ignore_index=True
-                        )
-                        st.session_state.all_transactions.drop_duplicates(
-                            subset=['dateOp', 'label', 'amount'],
-                            inplace=True
-                        )
-                    
-                    save_transactions()
-                    st.success(f"✅ {len(new_df)} transactions importées avec succès !")
-                    st.balloons()
-                    st.rerun()
-
-# ========================================
-# PAGE: RÈGLES
-# ========================================
-elif page == "⚙️ Règles":
-    st.header("⚙️ Règles de catégorisation")
-    
-    st.markdown("""
-    <div class="info-box">
-        Les règles permettent de catégoriser automatiquement vos transactions.
-        Si le libellé contient le mot-clé, la transaction sera classée dans la catégorie définie.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Formulaire d'ajout
-    st.markdown("### ➕ Ajouter une nouvelle règle")
-    
-    col1, col2, col3 = st.columns([2, 2, 1])
-    
-    with col1:
-        new_keyword = st.text_input(
-            "Mot-clé",
-            placeholder="Ex: colruyt, carrefour, shell",
-            help="Le mot-clé sera recherché dans le libellé (insensible à la casse)"
-        )
-    
-    with col2:
-        new_category = st.text_input(
-            "Catégorie",
-            placeholder="Ex: Alimentation, Transport, Loisirs",
-            help="La catégorie à attribuer automatiquement"
-        )
-    
-    with col3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("➕ Ajouter", type="primary", use_container_width=True):
-            if new_keyword and new_category:
-                # Vérifier si la règle existe déjà
-                exists = any(r['keyword'].lower() == new_keyword.lower() for r in st.session_state.rules)
-                if exists:
-                    st.error("⚠️ Cette règle existe déjà")
-                else:
-                    st.session_state.rules.append({
-                        'keyword': new_keyword,
-                        'category': new_category
-                    })
-                    save_rules()
-                    recategorize_all()
-                    st.success(f"✅ Règle ajoutée : '{new_keyword}' → '{new_category}'")
-                    st.rerun()
-            else:
-                st.error("⚠️ Veuillez remplir tous les champs")
-    
-    st.markdown("---")
-    
-    # Liste des règles
-    st.markdown(f"### 📋 Règles actives ({len(st.session_state.rules)})")
-    
-    if st.session_state.rules:
-        # Grouper par catégorie
-        rules_by_category = {}
-        for rule in st.session_state.rules:
-            cat = rule['category']
-            if cat not in rules_by_category:
-                rules_by_category[cat] = []
-            rules_by_category[cat].append(rule['keyword'])
-        
-        # Afficher par catégorie
-        for category, keywords in sorted(rules_by_category.items()):
-            with st.expander(f"📁 {category} ({len(keywords)} règles)"):
-                for idx, rule in enumerate(st.session_state.rules):
-                    if rule['category'] == category:
-                        col1, col2, col3 = st.columns([2, 2, 1])
-                        
-                        rule_idx = st.session_state.rules.index(rule)
-                        
-                        with col1:
-                            st.text_input(
-                                f"kw_{rule_idx}",
-                                value=rule['keyword'],
-                                disabled=True,
-                                label_visibility="collapsed"
-                            )
-                        
-                        with col2:
-                            st.text_input(
-                                f"cat_{rule_idx}",
-                                value=rule['category'],
-                                disabled=True,
-                                label_visibility="collapsed"
-                            )
-                        
-                        with col3:
-                            if st.button("🗑️", key=f"del_{rule_idx}", use_container_width=True):
-                                st.session_state.rules.pop(rule_idx)
-                                save_rules()
-                                recategorize_all()
-                                st.rerun()
-        
-        # Actions globales
-        st.markdown("---")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=True):
-                recategorize_all()
-                st.success("✅ Toutes les transactions ont été recatégorisées")
-        
-        with col2:
-            if st.button("🗑️ Supprimer toutes les règles", type="secondary", use_container_width=True):
-                if st.checkbox("⚠️ Confirmer la suppression"):
-                    st.session_state.rules = []
-                    save_rules()
-                    recategorize_all()
-                    st.success("✅ Toutes les règles ont été supprimées")
-                    st.rerun()
-    else:
-        st.markdown("""
-        <div class="warning-box">
-            ⚠️ Aucune règle configurée. Ajoutez des règles pour automatiser la catégorisation !
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Suggestions de règles
-        st.markdown("### 💡 Suggestions de règles courantes")
-        suggestions = [
-            ("colruyt", "Alimentation"),
-            ("carrefour", "Alimentation"),
-            ("lidl", "Alimentation"),
-            ("shell", "Transport"),
-            ("total", "Transport"),
-            ("netflix", "Loisirs"),
-            ("spotify", "Loisirs"),
-            ("edf", "Logement"),
-            ("eau", "Logement"),
-        ]
-        
-        cols = st.columns(3)
-        for idx, (keyword, category) in enumerate(suggestions):
-            with cols[idx % 3]:
-                if st.button(f"➕ {keyword} → {category}", key=f"sug_{idx}", use_container_width=True):
-                    st.session_state.rules.append({'keyword': keyword, 'category': category})
-                    save_rules()
-                    recategorize_all()
-                    st.rerun()
-
-# ========================================
 # PAGE: TRANSACTIONS
 # ========================================
-elif page == "📋 Transactions":
-    st.header("📋 Liste des transactions")
+elif page == "Transactions":
+    st.header("Liste des transactions")
     
     if st.session_state.all_transactions.empty:
-        st.warning("⚠️ Aucune transaction chargée.")
+        st.info("Aucune transaction chargée.")
     else:
         df = st.session_state.all_transactions.copy()
         
@@ -861,25 +694,20 @@ elif page == "📋 Transactions":
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            months = sorted(df['dateOp'].str[:7].unique(), reverse=True)
-            selected_month_filter = st.selectbox(
-                "📅 Mois",
-                ["Tous"] + list(months),
-                format_func=lambda x: x if x == "Tous" else datetime.strptime(x, "%Y-%m").strftime("%B %Y")
-            )
+            categories = ["Toutes"] + sorted(df['autoCategory'].unique().tolist())
+            selected_category = st.selectbox("Catégorie", categories)
         
         with col2:
-            categories = ["Toutes"] + sorted(df['autoCategory'].unique().tolist())
-            selected_category = st.selectbox("🏷️ Catégorie", categories)
+            type_filter = st.selectbox("Type", ["Tous", "Dépenses", "Revenus", "Mouvements internes"])
         
         with col3:
-            type_filter = st.selectbox("💰 Type", ["Tous", "Dépenses", "Revenus", "Mouvements internes"])
+            search = st.text_input("Rechercher", placeholder="Libellé...")
         
-        # Appliquer les filtres
+        # Appliquer filtres
         filtered_df = df.copy()
         
-        if selected_month_filter != "Tous":
-            filtered_df = filtered_df[filtered_df['dateOp'].str.startswith(selected_month_filter)]
+        if st.session_state.selected_month != "Tous les mois":
+            filtered_df = filtered_df[filtered_df['dateOp'].str.startswith(st.session_state.selected_month)]
         
         if selected_category != "Toutes":
             filtered_df = filtered_df[filtered_df['autoCategory'] == selected_category]
@@ -889,13 +717,15 @@ elif page == "📋 Transactions":
         elif type_filter == "Revenus":
             filtered_df = filtered_df[filtered_df['amount'] > 0]
         elif type_filter == "Mouvements internes":
-            filtered_df = filtered_df[filtered_df['autoCategory'] == '💰 Mouvement interne']
+            filtered_df = filtered_df[filtered_df['autoCategory'] == 'Mouvement interne']
         
-        # Affichage
-        st.markdown(f"### 📊 {len(filtered_df)} transactions")
+        if search:
+            filtered_df = filtered_df[filtered_df['label'].str.contains(search, case=False, na=False)]
+        
+        # Statistiques
+        st.markdown(f"### {len(filtered_df)} transactions")
         
         if not filtered_df.empty:
-            # Statistiques rapides
             col1, col2, col3 = st.columns(3)
             with col1:
                 total_in = filtered_df[filtered_df['amount'] > 0]['amount'].sum()
@@ -915,14 +745,20 @@ elif page == "📋 Transactions":
             
             st.dataframe(display_df, use_container_width=True, hide_index=True, height=600)
         else:
-            st.info("Aucune transaction ne correspond aux filtres sélectionnés")
+            st.info("Aucune transaction ne correspond aux filtres")
 
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: gray; padding: 20px;'>
-    💰 <strong>Gestionnaire de Dépenses Boursobank</strong><br>
-    Vos données sont stockées localement et ne sont jamais partagées<br>
-    Version 1.0 | Créé avec ❤️ et Streamlit
-</div>
-""", unsafe_allow_html=True)
+# ========================================
+# PAGE: CATÉGORIES (RÈGLES)
+# ========================================
+elif page == "Catégories":
+    st.header("Règles de catégorisation")
+    
+    st.markdown("""
+    <div class="info-box">
+        Les règles permettent de catégoriser automatiquement vos transactions.
+        Si le libellé contient le mot-clé, la transaction sera classée dans la catégorie définie.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Formulaire d'ajout
+    col1, col2, col3 = st
