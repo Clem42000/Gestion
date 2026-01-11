@@ -33,7 +33,7 @@ def check_password():
     # import hashlib
     # print(hashlib.sha256("VOTRE_MOT_DE_PASSE".encode()).hexdigest())
 
-    STORED_PASSWORD_HASH = " 73efb19f64603709eb977b600173843d3c779f7b971304bd28ca13142fbf6009 "  # Hash de "password"
+    STORED_PASSWORD_HASH = " d75360106b1f374d8fe6bc31a20c96022ef92b937358a0db8297874e289619f0 "  # Hash de "password"
 
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
@@ -42,13 +42,6 @@ def check_password():
         st.markdown("# 🔐 Accès sécurisé")
         st.markdown("### Gestionnaire de Dépenses Boursobank")
 
-        st.markdown("""
-        <div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0;'>
-            ⚠️ <strong>Première utilisation ?</strong><br>
-            Le mot de passe par défaut est : <code>password</code><br>
-            Changez-le immédiatement dans le code (voir instructions dans Main.py)
-        </div>
-        """, unsafe_allow_html=True)
 
         password = st.text_input("Mot de passe", type="password", key="password_input")
 
