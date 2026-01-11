@@ -42,17 +42,16 @@ def check_password():
         st.markdown("# 🔐 Accès sécurisé")
         st.markdown("### Gestionnaire de Dépenses Boursobank")
 
-
-        password = st.text_input("Mot de passe", type="password", key="password_input")
-
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("🔓 Se connecter", type="primary", use_container_width=True):
-                if hash_password(password) == STORED_PASSWORD_HASH:
-                    st.session_state.authenticated = True
-                    st.rerun()
-                else:
-                    st.error("❌ Mot de passe incorrect")
+if st.button("🔓 Se connecter", type="primary", use_container_width=True):
+    input_hash = hash_password(password)
+    st.write(f"Hash entré : {input_hash}")  # DEBUG
+    st.write(f"Hash stocké : {STORED_PASSWORD_HASH}")  # DEBUG
+    
+    if input_hash == STORED_PASSWORD_HASH:
+        st.session_state.authenticated = True
+        st.rerun()
+    else:
+        st.error("❌ Mot de passe incorrect")
 
         st.stop()
 
