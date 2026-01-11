@@ -31,7 +31,7 @@ def check_password():
     # import hashlib
     # print(hashlib.sha256("VOTRE_MOT_DE_PASSE".encode()).hexdigest())
     
-    STORED_PASSWORD_HASH = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"  # Hash de "password"
+    STORED_PASSWORD_HASH = "73efb19f64603709eb977b600173843d3c779f7b971304bd28ca13142fbf6009"  # Hash de "password"
     
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
