@@ -954,7 +954,7 @@ elif page == "Import CSV":
                 # Vérifier si le DataFrame a les colonnes attendues
                 required_columns = {'dateOp', 'label', 'amount'}
                 if not required_columns.issubset(new_transactions.columns):
-                    st.error(f"Le fichier CSV ne contient pas les colonnes requises : {required_columns}"))
+                    st.error(f"Le fichier CSV ne contient pas les colonnes requises : {required_columns}")
 
                     # Sauvegarder les transactions
                     save_transactions()
