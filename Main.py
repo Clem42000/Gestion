@@ -230,32 +230,75 @@ def categorize_transaction(row, rules):
     try:
         label = str(row.get("label", "")).lower()
         supplier = str(row.get("supplierFound", "")).lower()
+        amount = row.get("amount", 0)
         text = f"{supplier} {label}"
 
-        # 1️⃣ Mouvements internes
-        internal_keywords = [
-            "virement depuis livret",
-            "vir virement",
-            "mouvements internes",
-            "virements reçus",
-            "virements émis"
-        ]
-        if any(k in text for k in internal_keywords):
-            return "Mouvement interne"
+        # ===============================
+        # 1️⃣ VIREMENTS / SALAIRES / REMBOURSEMENTS
+        # ===============================
+        if "vir" in text or "virement" in text:
 
-        # 2️⃣ Règles utilisateur (priorité MAX)
+            # ---- VIREMENTS INTERNES (épargne / comptes perso)
+            internal_keywords = [
+                "depuis livret",
+                "vers livret",
+                "livret a",
+                "livret",
+                "epargne",
+                "compte interne",
+                "mouvements internes"
+            ]
+            if any(k in text for k in internal_keywords):
+                return "Mouvement interne"
+
+            # ---- SALAIRES
+            salary_keywords = [
+                "salaire",
+                "payroll",
+                "paie",
+                "payement salaire",
+                "traitement",
+                "remuneration"
+            ]
+            if any(k in text for k in salary_keywords) and amount > 0:
+                return "Salaire"
+
+            # ---- REMBOURSEMENTS
+            refund_keywords = [
+                "remboursement",
+                "rembours",
+                "indemnite",
+                "indemnisation",
+                "assurance",
+                "cpam",
+                "mutuelle"
+            ]
+            if any(k in text for k in refund_keywords) and amount > 0:
+                return "Remboursement"
+
+            # ---- VIREMENTS EXTERNES
+            if amount > 0:
+                return "Virement entrant"
+            else:
+                return "Virement sortant"
+
+        # ===============================
+        # 2️⃣ RÈGLES UTILISATEUR (PRIORITÉ MAX)
+        # ===============================
         for rule in rules:
             if rule["keyword"].lower() in text:
                 return rule["category"]
 
-        # 3️⃣ Règles automatiques (auto_rules.json)
+        # ===============================
+        # 3️⃣ RÈGLES AUTOMATIQUES (auto_rules.json)
+        # ===============================
         for category, keywords in st.session_state.auto_rules.items():
             if any(k in text for k in keywords):
                 return category
 
         return "Divers"
 
-    except Exception as e:
+    except Exception:
         return "Erreur catégorisation"
 
 
