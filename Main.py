@@ -7,6 +7,24 @@ import json
 import os
 import hashlib
 
+#Import des data du fichier JSON
+AUTO_RULES_FILE = "auto_rules.json"
+
+def load_auto_rules():
+    if os.path.exists(AUTO_RULES_FILE):
+        try:
+            with open(AUTO_RULES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+if "auto_rules" not in st.session_state:
+    st.session_state.auto_rules = load_auto_rules()
+
+
+
+
 # Configuration de la page
 st.set_page_config(
     page_title="Gestion Dépenses",
@@ -176,43 +194,37 @@ def save_transactions():
     st.session_state.all_transactions.to_csv(TRANSACTIONS_FILE, sep=';', index=False)
 
 def categorize_transaction(row, rules):
-    """Catégorise une transaction en fonction des règles."""
     try:
-        if isinstance(row, pd.Series):
-            label = str(row.get('label', ''))
-            category_parent = str(row.get('categoryParent', ''))
-            category = str(row.get('category', ''))
-        else:
-            label = str(row)
-            category_parent = ''
-            category = ''
+        label = str(row.get("label", "")).lower()
+        supplier = str(row.get("supplierFound", "")).lower()
+        text = f"{supplier} {label}"
 
-        label_lower = label.lower()
-
-        # Détecter les mouvements internes
+        # 1️⃣ Mouvements internes
         internal_keywords = [
-            'virement depuis livret a',
-            'vir virement depuis livret a',
-            'virement depuis boursobank',
-            'vir virement depuis boursobank',
-            'mouvements internes',
-            'virements reçus de comptes à comptes',
-            'virements émis de comptes à comptes'
+            "virement depuis livret",
+            "vir virement",
+            "mouvements internes",
+            "virements reçus",
+            "virements émis"
         ]
+        if any(k in text for k in internal_keywords):
+            return "Mouvement interne"
 
-        if any(keyword in label_lower for keyword in internal_keywords):
-            return 'Mouvement interne'
-
-        # Appliquer les règles personnalisées
+        # 2️⃣ Règles utilisateur (priorité MAX)
         for rule in rules:
-            if rule['keyword'].lower() in label_lower:
-                return rule['category']
+            if rule["keyword"].lower() in text:
+                return rule["category"]
 
-        return 'Non catégorisé'
+        # 3️⃣ Règles automatiques (auto_rules.json)
+        for category, keywords in st.session_state.auto_rules.items():
+            if any(k in text for k in keywords):
+                return category
+
+        return "Divers"
 
     except Exception as e:
-        st.error(f"Erreur lors de la catégorisation : {str(e)}")
-        return 'Erreur de catégorisation'
+        return "Erreur catégorisation"
+
 
 
 def parse_csv(uploaded_file):
@@ -222,6 +234,11 @@ def parse_csv(uploaded_file):
 
         # Nettoyer les noms de colonnes
         df.columns = df.columns.str.strip()
+        
+        # Sécuriser supplierFound
+        if "supplierFound" not in df.columns:
+            df["supplierFound"] = ""
+
 
         # Vérifier que les colonnes requises existent
         required_columns = {'dateOp', 'label', 'amount'}
@@ -233,7 +250,7 @@ def parse_csv(uploaded_file):
         df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
 
         # Catégoriser automatiquement
-        df['autoCategory'] = df.apply(
+        df["autoCategory"] = df.apply(
             lambda row: categorize_transaction(row, st.session_state.rules),
             axis=1
         )
@@ -241,13 +258,13 @@ def parse_csv(uploaded_file):
         # Convertir les dates en format datetime
         if 'dateOp' in df.columns:
             df['dateOp'] = pd.to_datetime(df['dateOp'], format='%Y-%m-%d', errors='coerce')
+            df["dateOp_str"] = df["dateOp"].dt.strftime("%Y-%m")
 
         return df
 
     except Exception as e:
         st.error(f"Erreur lors de la lecture du CSV : {str(e)}")
         return None
-
 
 def recategorize_all():
     """Recatégorise toutes les transactions"""
@@ -274,7 +291,9 @@ def calculate_stats(df, selected_month=None):
         }
     
     if selected_month and selected_month != "Tous les mois":
-        df = df[df['dateOp'].str.startswith(selected_month)]
+        df = df[df["dateOp_str"] == selected_month]
+
+
     
     # Mouvements internes
     internal = df[df['autoCategory'] == 'Mouvement interne']
@@ -333,7 +352,8 @@ def get_month_comparison(df):
     if df.empty:
         return pd.DataFrame()
     
-    df['month'] = df['dateOp'].str[:7]
+    df['month'] = df['dateOp_str']
+
     
     monthly_stats = []
     for month in sorted(df['month'].unique()):
@@ -416,24 +436,26 @@ st.title("Gestionnaire de Finances")
 # Sélecteur de mois en haut (sticky)
 if not st.session_state.all_transactions.empty:
     st.markdown("<div class='month-selector'>", unsafe_allow_html=True)
-    
+
     available_months = sorted(
-        st.session_state.all_transactions['dateOp'].str[:7].unique(),
+        st.session_state.all_transactions['dateOp_str'].dropna().unique(),
         reverse=True
     )
-    
+
     col1, col2, col3 = st.columns([2, 3, 2])
     with col2:
         selected_month = st.selectbox(
             "Période",
             ["Tous les mois"] + list(available_months),
-            format_func=lambda x: x if x == "Tous les mois" else datetime.strptime(x, "%Y-%m").strftime("%B %Y"),
+            format_func=lambda x: x if x == "Tous les mois"
+            else datetime.strptime(x, "%Y-%m").strftime("%B %Y"),
             key="month_selector",
             label_visibility="collapsed"
         )
         st.session_state.selected_month = selected_month
-    
+
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 # Sidebar
 with st.sidebar:
@@ -450,7 +472,7 @@ with st.sidebar:
         st.markdown("## Statistiques globales")
         total_trans = len(st.session_state.all_transactions)
         total_rules = len(st.session_state.rules)
-        months = st.session_state.all_transactions['dateOp'].str[:7].nunique()
+        months = st.session_state.all_transactions['dateOp_str'].nunique()
         
         st.metric("Transactions", total_trans)
         st.metric("Règles actives", total_rules)
@@ -722,7 +744,8 @@ elif page == "Transactions":
         filtered_df = df.copy()
         
         if st.session_state.selected_month != "Tous les mois":
-            filtered_df = filtered_df[filtered_df['dateOp'].str.startswith(st.session_state.selected_month)]
+        filtered_df = filtered_df[filtered_ddf['dateOp_str'] == st.session_state.selected_month]
+        
         
         if selected_category != "Toutes":
             filtered_df = filtered_df[filtered_df['autoCategory'] == selected_category]
