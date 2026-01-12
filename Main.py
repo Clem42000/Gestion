@@ -165,13 +165,42 @@ check_password()
 # FONCTIONS UTILITAIRES
 # ========================================
 
+def remove_duplicates():
+    if st.session_state.all_transactions.empty:
+        return 0
+
+    df = st.session_state.all_transactions.copy()
+
+    df["transaction_id"] = df.apply(generate_transaction_id, axis=1)
+    before = len(df)
+
+    df = df.drop_duplicates(subset=["transaction_id"]).reset_index(drop=True)
+
+    removed = before - len(df)
+
+    st.session_state.all_transactions = df
+    save_transactions()
+
+    return removed
+
 
 def generate_transaction_id(row):
     """
-    Génère un identifiant unique et stable pour une transaction
-    (sert à détecter les doublons)
+    Identifiant robuste pour détecter les doublons bancaires
+    - ignore l'heure
+    - neutralise les dates manquantes
     """
-    raw = f"{row.get('dateOp')}_{row.get('amount')}_{row.get('label')}_{row.get('supplierFound')}"
+    date = row.get("dateOp")
+
+    if pd.isna(date):
+        date_str = "nodate"
+    else:
+        date_str = pd.to_datetime(date).strftime("%Y-%m-%d")
+
+    label = str(row.get("label", "")).strip().lower()
+    amount = f"{float(row.get('amount', 0)):.2f}"
+
+    raw = f"{date_str}|{label}|{amount}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -352,12 +381,24 @@ def parse_csv(uploaded_file):
         return None
 
 def recategorize_all():
-    """Recatégorise toutes les transactions"""
-    if not st.session_state.all_transactions.empty:
-        st.session_state.all_transactions['autoCategory'] = st.session_state.all_transactions.apply(
-            lambda row: categorize_transaction(row, st.session_state.rules), axis=1
-        )
-        save_transactions()
+    if st.session_state.all_transactions.empty:
+        return
+
+    df = st.session_state.all_transactions.copy()
+
+    # 🔁 Recatégorisation
+    df["autoCategory"] = df.apply(
+        lambda row: categorize_transaction(row, st.session_state.rules),
+        axis=1
+    )
+
+    # 🧹 Recalcul ID + suppression doublons
+    df["transaction_id"] = df.apply(generate_transaction_id, axis=1)
+    df = df.drop_duplicates(subset=["transaction_id"]).reset_index(drop=True)
+
+    st.session_state.all_transactions = df
+    save_transactions()
+
 
 def calculate_stats(df, selected_month=None):
     """Calcule les statistiques"""
@@ -572,6 +613,22 @@ if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=
         st.rerun()
 
         st.markdown("---")
+        # Détection des doublons
+if not st.session_state.all_transactions.empty:
+    tmp_ids = (
+        st.session_state.all_transactions
+        .apply(generate_transaction_id, axis=1)
+    )
+
+    has_duplicates = tmp_ids.duplicated().any()
+
+    if has_duplicates:
+        st.markdown("---")
+        if st.button("🧹 Supprimer les doublons", use_container_width=True):
+            removed = remove_duplicates()
+            st.success(f"{removed} doublon(s) supprimé(s)")
+            st.rerun()
+
         
         if st.button("Exporter Excel", use_container_width=True):
             excel_file = export_to_excel()
@@ -779,64 +836,86 @@ if page == "Tableau de bord":
                     hide_index=True
                 )
 
-
 # ========================================
 # PAGE: ÉVOLUTION
 # ========================================
-elif page == "Import CSV":
-    st.header("Importation des transactions")
+elif page == "Évolution":
+    st.header("📈 Évolution mensuelle")
 
-    uploaded_file = st.file_uploader(
-        "Importer un fichier CSV (Boursorama)",
-        type="csv",
-        key="csv_uploader"
+    if st.session_state.all_transactions.empty:
+        st.info("Aucune transaction chargée.")
+        st.stop()
+
+    # Calcul des stats mensuelles
+    monthly_data = get_month_comparison(st.session_state.all_transactions)
+
+    if monthly_data.empty:
+        st.warning("Pas assez de données pour afficher une évolution.")
+        st.stop()
+
+    # ===============================
+    # GRAPHIQUE ÉVOLUTION
+    # ===============================
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=monthly_data["Mois"],
+        y=monthly_data["Revenus"],
+        mode="lines+markers",
+        name="Revenus",
+        line=dict(width=3),
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=monthly_data["Mois"],
+        y=monthly_data["Dépenses"],
+        mode="lines+markers",
+        name="Dépenses",
+        line=dict(width=3),
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=monthly_data["Mois"],
+        y=monthly_data["Épargne"],
+        mode="lines+markers",
+        name="Épargne",
+        line=dict(width=3),
+    ))
+
+    fig.update_layout(
+        height=500,
+        hovermode="x unified",
+        xaxis_title="",
+        yaxis_title="Montant (€)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
 
-    if uploaded_file:
-        try:
-            new_transactions = parse_csv(uploaded_file)
+    st.plotly_chart(fig, use_container_width=True)
 
-            if new_transactions is None or new_transactions.empty:
-                st.warning("Aucune transaction valide trouvée dans le fichier.")
-                st.stop()
+    # ===============================
+    # TABLEAU COMPARATIF
+    # ===============================
+    st.markdown("### 📊 Comparaison mensuelle")
 
-            # ===============================
-            # IMPORT SANS DOUBLON
-            # ===============================
-            existing_ids = (
-                set(st.session_state.all_transactions["transaction_id"])
-                if not st.session_state.all_transactions.empty
-                else set()
-            )
+    display_monthly = monthly_data.copy()
 
-            new_transactions = new_transactions[
-                ~new_transactions["transaction_id"].isin(existing_ids)
-            ]
+    for col in ["Revenus", "Dépenses", "Solde", "Épargne"]:
+        display_monthly[col] = display_monthly[col].apply(lambda x: f"{x:.2f} €")
 
-            if new_transactions.empty:
-                st.warning("Toutes les transactions importées sont déjà présentes (doublons ignorés).")
-            else:
-                st.session_state.all_transactions = pd.concat(
-                    [st.session_state.all_transactions, new_transactions],
-                    ignore_index=True
-                )
+    st.dataframe(
+        display_monthly[["Mois", "Revenus", "Dépenses", "Solde", "Épargne"]],
+        use_container_width=True,
+        hide_index=True
+    )
 
-                save_transactions()
-
-                st.success(
-                    f"{len(new_transactions)} nouvelles transactions ajoutées "
-                    f"(doublons ignorés)."
-                )
-
-                st.markdown("### Aperçu des transactions importées")
-                st.dataframe(new_transactions.head())
-
-                if st.button("Recatégoriser toutes les transactions"):
-                    recategorize_all()
-                    st.success("Recatégorisation terminée !")
-
-        except Exception as e:
-            st.error(f"Erreur lors de l'import : {str(e)}")
 
 # ========================================
 # PAGE: TRANSACTIONS
@@ -980,7 +1059,7 @@ elif page == "Import CSV":
     if uploaded_file:
         try:
             new_transactions = parse_csv(uploaded_file)
-                        # ===============================
+            # ===============================
             # IMPORT SANS DOUBLON (OBLIGATOIRE)
             # ===============================
             
