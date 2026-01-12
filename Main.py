@@ -744,8 +744,9 @@ elif page == "Transactions":
         filtered_df = df.copy()
         
         if st.session_state.selected_month != "Tous les mois":
-        filtered_df = filtered_df[filtered_ddf['dateOp_str'] == st.session_state.selected_month]
-        
+            filtered_df = filtered_df[
+                filtered_df["dateOp_str"] == st.session_state.selected_month
+            ]
         
         if selected_category != "Toutes":
             filtered_df = filtered_df[filtered_df['autoCategory'] == selected_category]
