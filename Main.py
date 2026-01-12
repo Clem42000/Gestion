@@ -164,6 +164,17 @@ check_password()
 # ========================================
 # FONCTIONS UTILITAIRES
 # ========================================
+def remove_invalid_transactions():
+    df = st.session_state.all_transactions
+    before = len(df)
+
+    df = df.dropna(subset=["dateOp"])
+
+    removed = before - len(df)
+    st.session_state.all_transactions = df.reset_index(drop=True)
+    save_transactions()
+
+    return removed
 
 def remove_duplicates():
     if st.session_state.all_transactions.empty:
@@ -370,6 +381,7 @@ def parse_csv(uploaded_file):
         if 'dateOp' in df.columns:
             df['dateOp'] = pd.to_datetime(df['dateOp'], format='%Y-%m-%d', errors='coerce')
             df["dateOp_str"] = df["dateOp"].dt.strftime("%Y-%m")
+            df = df.dropna(subset=["dateOp"])
             
         # Générer transaction_id pour les nouvelles transactions
         df["transaction_id"] = df.apply(generate_transaction_id, axis=1)
@@ -662,6 +674,14 @@ with st.sidebar:
     if st.button("Déconnexion", type="secondary", use_container_width=True):
         st.session_state.authenticated = False
         st.rerun()
+with st.expander("Maintenance"):
+    if st.button("🧹 Supprimer les transactions sans date"):
+        removed = remove_invalid_transactions()
+        if removed == 0:
+            st.info("Aucune transaction invalide détectée.")
+        else:
+            st.success(f"{removed} transaction(s) supprimée(s).")
+            st.rerun()
 
 
 # ========================================
