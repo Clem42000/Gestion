@@ -165,6 +165,16 @@ check_password()
 # FONCTIONS UTILITAIRES
 # ========================================
 
+
+def generate_transaction_id(row):
+    """
+    Génère un identifiant unique et stable pour une transaction
+    (sert à détecter les doublons)
+    """
+    raw = f"{row.get('dateOp')}_{row.get('amount')}_{row.get('label')}_{row.get('supplierFound')}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def load_rules():
     """Charge les règles de catégorisation"""
     if os.path.exists(RULES_FILE):
@@ -197,9 +207,16 @@ def load_transactions():
             if "supplierFound" not in df.columns:
                 df["supplierFound"] = ""
 
+            # Générer transaction_id si absent
+            if "transaction_id" not in df.columns:
+                df["transaction_id"] = df.apply(generate_transaction_id, axis=1)
+
+            # Sécurité ultime : suppression des doublons existants
+            df = df.drop_duplicates(subset=["transaction_id"]).reset_index(drop=True)
+
             return df
 
-        except Exception as e:
+        except Exception:
             return pd.DataFrame()
 
     return pd.DataFrame()
@@ -275,6 +292,9 @@ def parse_csv(uploaded_file):
         if 'dateOp' in df.columns:
             df['dateOp'] = pd.to_datetime(df['dateOp'], format='%Y-%m-%d', errors='coerce')
             df["dateOp_str"] = df["dateOp"].dt.strftime("%Y-%m")
+            
+        # Générer transaction_id pour les nouvelles transactions
+        df["transaction_id"] = df.apply(generate_transaction_id, axis=1)
 
         return df
 
@@ -664,71 +684,100 @@ if page == "Tableau de bord":
             
             st.dataframe(cat_df_full[display_cols], use_container_width=True, hide_index=True)
 
+            # ===============================
+            # TOP 5 PLUS GROSSES DÉPENSES
+            # ===============================
+            st.markdown("---")
+            st.markdown("### 💸 Top 5 des plus grosses dépenses du mois")
+            
+            df_top = st.session_state.all_transactions.copy()
+            
+            # Filtre mois
+            if st.session_state.selected_month != "Tous les mois":
+                df_top = df_top[df_top["dateOp_str"] == st.session_state.selected_month]
+            
+            # Garder uniquement les dépenses
+            df_top = df_top[df_top["amount"] < 0]
+            
+            if df_top.empty:
+                st.info("Aucune dépense pour cette période.")
+            else:
+                top5 = (
+                    df_top
+                    .assign(abs_amount=df_top["amount"].abs())
+                    .sort_values("abs_amount", ascending=False)
+                    .head(5)
+                )
+            
+                display_top5 = top5[["dateOp", "label", "autoCategory", "amount"]].copy()
+                display_top5.columns = ["Date", "Libellé", "Catégorie", "Montant"]
+                display_top5["Date"] = display_top5["Date"].dt.strftime("%d/%m/%Y")
+                display_top5["Montant"] = display_top5["Montant"].apply(lambda x: f"{abs(x):.2f} €")
+            
+                st.dataframe(
+                    display_top5,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
 # ========================================
 # PAGE: ÉVOLUTION
 # ========================================
-elif page == "Évolution":
-    st.header("Évolution mensuelle")
-    
-    if st.session_state.all_transactions.empty:
-        st.info("Aucune transaction chargée.")
-    else:
-        monthly_data = get_month_comparison(st.session_state.all_transactions)
-        
-        if not monthly_data.empty:
-            # Graphique d'évolution
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=monthly_data['Mois'],
-                y=monthly_data['Revenus'],
-                mode='lines+markers',
-                name='Revenus',
-                line=dict(color='#10b981', width=3),
-                marker=dict(size=8)
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=monthly_data['Mois'],
-                y=monthly_data['Dépenses'],
-                mode='lines+markers',
-                name='Dépenses',
-                line=dict(color='#ef4444', width=3),
-                marker=dict(size=8)
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=monthly_data['Mois'],
-                y=monthly_data['Épargne'],
-                mode='lines+markers',
-                name='Épargne',
-                line=dict(color='#3b82f6', width=3),
-                marker=dict(size=8)
-            ))
-            
-            fig.update_layout(
-                height=500,
-                hovermode='x unified',
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                xaxis_title="",
-                yaxis_title="Montant (€)",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+elif page == "Import CSV":
+    st.header("Importation des transactions")
+
+    uploaded_file = st.file_uploader(
+        "Importer un fichier CSV (Boursorama)",
+        type="csv",
+        key="csv_uploader"
+    )
+
+    if uploaded_file:
+        try:
+            new_transactions = parse_csv(uploaded_file)
+
+            if new_transactions is None or new_transactions.empty:
+                st.warning("Aucune transaction valide trouvée dans le fichier.")
+                st.stop()
+
+            # ===============================
+            # IMPORT SANS DOUBLON
+            # ===============================
+            existing_ids = (
+                set(st.session_state.all_transactions["transaction_id"])
+                if not st.session_state.all_transactions.empty
+                else set()
             )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Tableau comparatif
-            st.markdown("### Tableau comparatif")
-            display_monthly = monthly_data.copy()
-            for col in ['Revenus', 'Dépenses', 'Solde', 'Épargne']:
-                display_monthly[col] = display_monthly[col].apply(lambda x: f"{x:.2f} €")
-            
-            st.dataframe(
-                display_monthly[['Mois', 'Revenus', 'Dépenses', 'Solde', 'Épargne']],
-                use_container_width=True,
-                hide_index=True
-            )
+
+            new_transactions = new_transactions[
+                ~new_transactions["transaction_id"].isin(existing_ids)
+            ]
+
+            if new_transactions.empty:
+                st.warning("Toutes les transactions importées sont déjà présentes (doublons ignorés).")
+            else:
+                st.session_state.all_transactions = pd.concat(
+                    [st.session_state.all_transactions, new_transactions],
+                    ignore_index=True
+                )
+
+                save_transactions()
+
+                st.success(
+                    f"{len(new_transactions)} nouvelles transactions ajoutées "
+                    f"(doublons ignorés)."
+                )
+
+                st.markdown("### Aperçu des transactions importées")
+                st.dataframe(new_transactions.head())
+
+                if st.button("Recatégoriser toutes les transactions"):
+                    recategorize_all()
+                    st.success("Recatégorisation terminée !")
+
+        except Exception as e:
+            st.error(f"Erreur lors de l'import : {str(e)}")
 
 # ========================================
 # PAGE: TRANSACTIONS
@@ -872,20 +921,40 @@ elif page == "Import CSV":
     if uploaded_file:
         try:
             new_transactions = parse_csv(uploaded_file)
+                        # ===============================
+            # IMPORT SANS DOUBLON (OBLIGATOIRE)
+            # ===============================
+            
+            existing_ids = (
+                set(st.session_state.all_transactions["transaction_id"])
+                if not st.session_state.all_transactions.empty
+                else set()
+            )
+            
+            new_transactions = new_transactions[
+                ~new_transactions["transaction_id"].isin(existing_ids)
+            ]
+            
+            if new_transactions.empty:
+                st.warning("Toutes les transactions importées sont déjà présentes (doublons ignorés).")
+            else:
+                st.session_state.all_transactions = pd.concat(
+                    [st.session_state.all_transactions, new_transactions],
+                    ignore_index=True
+                )
+            
+                save_transactions()
+            
+                st.success(
+                    f"{len(new_transactions)} nouvelles transactions ajoutées "
+                    f"(doublons ignorés)."
+                )
+
             if new_transactions is not None:
                 # Vérifier si le DataFrame a les colonnes attendues
                 required_columns = {'dateOp', 'label', 'amount'}
                 if not required_columns.issubset(new_transactions.columns):
-                    st.error(f"Le fichier CSV ne contient pas les colonnes requises : {required_columns}")
-                else:
-                    # Ajouter les nouvelles transactions
-                    if st.session_state.all_transactions.empty:
-                        st.session_state.all_transactions = new_transactions
-                    else:
-                        st.session_state.all_transactions = pd.concat(
-                            [st.session_state.all_transactions, new_transactions],
-                            ignore_index=True
-                        )
+                    st.error(f"Le fichier CSV ne contient pas les colonnes requises : {required_columns}"))
 
                     # Sauvegarder les transactions
                     save_transactions()
