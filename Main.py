@@ -176,63 +176,78 @@ def save_transactions():
     st.session_state.all_transactions.to_csv(TRANSACTIONS_FILE, sep=';', index=False)
 
 def categorize_transaction(row, rules):
-    """Applique les règles de catégorisation"""
-    if hasattr(row, 'get'):
-        label = str(row.get('label', ''))
-        category_parent = str(row.get('categoryParent', ''))
-        category = str(row.get('category', ''))
-    else:
-        label = str(row)
-        category_parent = ''
-        category = ''
-    
-    label_lower = label.lower()
-    category_parent_lower = category_parent.lower()
-    category_lower = category.lower()
-    
-    # Détecter mouvements internes
-    if 'mouvements internes' in category_parent_lower or 'mouvements internes' in category_lower:
-        return 'Mouvement interne'
-    
-    if 'virements reçus de comptes à comptes' in category_lower or 'virements émis de comptes à comptes' in category_lower:
-        return 'Mouvement interne'
-    
-    internal_keywords = [
-        'virement depuis livret a',
-        'vir virement depuis livret a',
-        'virement depuis boursobank',
-        'vir virement depuis boursobank'
-    ]
-    if any(keyword in label_lower for keyword in internal_keywords):
-        return 'Mouvement interne'
-    
-    # Règles personnalisées
-    for rule in rules:
-        if rule['keyword'].lower() in label_lower:
-            return rule['category']
-    
-    return 'Non catégorisé'
+    """Catégorise une transaction en fonction des règles."""
+    try:
+        if isinstance(row, pd.Series):
+            label = str(row.get('label', ''))
+            category_parent = str(row.get('categoryParent', ''))
+            category = str(row.get('category', ''))
+        else:
+            label = str(row)
+            category_parent = ''
+            category = ''
+
+        label_lower = label.lower()
+
+        # Détecter les mouvements internes
+        internal_keywords = [
+            'virement depuis livret a',
+            'vir virement depuis livret a',
+            'virement depuis boursobank',
+            'vir virement depuis boursobank',
+            'mouvements internes',
+            'virements reçus de comptes à comptes',
+            'virements émis de comptes à comptes'
+        ]
+
+        if any(keyword in label_lower for keyword in internal_keywords):
+            return 'Mouvement interne'
+
+        # Appliquer les règles personnalisées
+        for rule in rules:
+            if rule['keyword'].lower() in label_lower:
+                return rule['category']
+
+        return 'Non catégorisé'
+
+    except Exception as e:
+        st.error(f"Erreur lors de la catégorisation : {str(e)}")
+        return 'Erreur de catégorisation'
+
 
 def parse_csv(uploaded_file):
-    """Parse le CSV de Boursobank"""
+    """Parse le CSV de Boursorama"""
     try:
-        df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8')
-        
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].str.replace('"', '')
-        
-        if 'amount' in df.columns:
-            df['amount'] = df['amount'].str.replace(' ', '').str.replace(',', '.').astype(float)
-        
+        df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8', on_bad_lines='skip')
+
+        # Nettoyer les noms de colonnes
+        df.columns = df.columns.str.strip()
+
+        # Vérifier que les colonnes requises existent
+        required_columns = {'dateOp', 'label', 'amount'}
+        if not required_columns.issubset(df.columns):
+            raise ValueError(f"Colonnes manquantes : {required_columns - set(df.columns)}")
+
+        # Nettoyer les valeurs de la colonne 'amount'
+        df['amount'] = df['amount'].astype(str).str.replace(' ', '').str.replace(',', '.')
+        df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
+
+        # Catégoriser automatiquement
         df['autoCategory'] = df.apply(
-            lambda row: categorize_transaction(row, st.session_state.rules), axis=1
+            lambda row: categorize_transaction(row, st.session_state.rules),
+            axis=1
         )
-        
+
+        # Convertir les dates en format datetime
+        if 'dateOp' in df.columns:
+            df['dateOp'] = pd.to_datetime(df['dateOp'], format='%Y-%m-%d', errors='coerce')
+
         return df
+
     except Exception as e:
-        st.error(f"Erreur lors de la lecture du CSV : {e}")
+        st.error(f"Erreur lors de la lecture du CSV : {str(e)}")
         return None
+
 
 def recategorize_all():
     """Recatégorise toutes les transactions"""
@@ -761,4 +776,142 @@ elif page == "Catégories":
     """, unsafe_allow_html=True)
     
     # Formulaire d'ajout
-    col1, col2, col3 = st
+    col1, col2, col3 = st.columns(3)
+
+# Formulaire d'ajout de règle
+with col1:
+    new_keyword = st.text_input("Mot-clé (ex: Colruyt)", key="new_keyword")
+with col2:
+    new_category = st.text_input("Catégorie (ex: Alimentation)", key="new_category")
+with col3:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Ajouter la règle", key="add_rule"):
+        if new_keyword and new_category:
+            st.session_state.rules.append({
+                "keyword": new_keyword,
+                "category": new_category
+            })
+            save_rules()
+            st.success(f"Règle ajoutée : '{new_keyword}' → '{new_category}'")
+        else:
+            st.warning("Veuillez remplir tous les champs.")
+
+# Afficher les règles existantes
+st.markdown("### Règles existantes")
+if st.session_state.rules:
+    rules_df = pd.DataFrame(st.session_state.rules)
+    st.dataframe(rules_df, use_container_width=True)
+
+    # Supprimer une règle
+    st.markdown("### Supprimer une règle")
+    rule_to_delete = st.selectbox(
+        "Sélectionner une règle à supprimer",
+        options=[f"{rule['keyword']} → {rule['category']}" for rule in st.session_state.rules],
+        index=0,
+        key="rule_to_delete"
+    )
+
+    if st.button("Supprimer la règle", key="delete_rule"):
+        keyword_to_delete = rule_to_delete.split(" → ")[0]
+        st.session_state.rules = [rule for rule in st.session_state.rules if rule["keyword"] != keyword_to_delete]
+        save_rules()
+        st.success(f"Règle supprimée : '{keyword_to_delete}'")
+else:
+    st.info("Aucune règle définie. Ajoutez-en une ci-dessus.")
+
+
+# ========================================
+# PAGE: IMPORT CSV
+# ========================================
+elif page == "Import CSV":
+    st.header("Importation des transactions")
+
+    uploaded_file = st.file_uploader(
+        "Importer un fichier CSV (Boursorama)",
+        type="csv",
+        key="csv_uploader"
+    )
+
+    if uploaded_file:
+        try:
+            new_transactions = parse_csv(uploaded_file)
+            if new_transactions is not None:
+                # Vérifier si le DataFrame a les colonnes attendues
+                required_columns = {'dateOp', 'label', 'amount'}
+                if not required_columns.issubset(new_transactions.columns):
+                    st.error(f"Le fichier CSV ne contient pas les colonnes requises : {required_columns}")
+                else:
+                    # Ajouter les nouvelles transactions
+                    if st.session_state.all_transactions.empty:
+                        st.session_state.all_transactions = new_transactions
+                    else:
+                        st.session_state.all_transactions = pd.concat(
+                            [st.session_state.all_transactions, new_transactions],
+                            ignore_index=True
+                        )
+
+                    # Sauvegarder les transactions
+                    save_transactions()
+
+                    st.success(f"Fichier importé avec succès ! {len(new_transactions)} transactions ajoutées.")
+                    st.markdown("### Aperçu des transactions importées")
+                    st.dataframe(new_transactions.head())
+
+                    # Bouton pour recatégoriser
+                    if st.button("Recatégoriser toutes les transactions"):
+                        recategorize_all()
+                        st.success("Recatégorisation terminée !")
+
+        except Exception as e:
+            st.error(f"Erreur lors de l'import : {str(e)}")
+
+
+# ========================================
+# PAGE: BUDGETS
+# ========================================
+elif page == "Budgets":
+    st.header("Gestion des budgets")
+
+    if st.session_state.all_transactions.empty:
+        st.info("Aucune transaction chargée. Importez un fichier CSV pour définir des budgets.")
+    else:
+        # Formulaire pour ajouter/modifier un budget
+        st.markdown("### Définir un budget par catégorie")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            categories = ["Toutes"] + sorted(st.session_state.all_transactions['autoCategory'].unique().tolist())
+            budget_category = st.selectbox("Catégorie", categories)
+
+        with col2:
+            budget_amount = st.number_input("Montant (€)", min_value=0.0, step=10.0, value=0.0)
+
+        if st.button("Ajouter/Modifier le budget"):
+            if budget_category != "Toutes":
+                st.session_state.budgets[budget_category] = budget_amount
+                st.success(f"Budget de {budget_amount} € défini pour la catégorie '{budget_category}'.")
+            else:
+                st.warning("Veuillez sélectionner une catégorie valide.")
+
+        # Afficher les budgets actuels
+        st.markdown("### Budgets actuels")
+        if st.session_state.budgets:
+            budgets_df = pd.DataFrame(
+                list(st.session_state.budgets.items()),
+                columns=["Catégorie", "Budget (€)"]
+            )
+            st.dataframe(budgets_df, use_container_width=True)
+        else:
+            st.info("Aucun budget défini.")
+
+        # Supprimer un budget
+        if st.session_state.budgets:
+            st.markdown("### Supprimer un budget")
+            category_to_delete = st.selectbox(
+                "Sélectionner une catégorie à supprimer",
+                list(st.session_state.budgets.keys())
+            )
+
+            if st.button("Supprimer"):
+                del st.session_state.budgets[category_to_delete]
+                st.success(f"Budget supprimé pour la catégorie '{category_to_delete}'.")
