@@ -181,13 +181,29 @@ def save_rules():
         json.dump(st.session_state.rules, f, ensure_ascii=False, indent=2)
 
 def load_transactions():
-    """Charge toutes les transactions"""
     if os.path.exists(TRANSACTIONS_FILE):
         try:
-            return pd.read_csv(TRANSACTIONS_FILE, sep=';')
-        except:
+            df = pd.read_csv(TRANSACTIONS_FILE, sep=';')
+
+            # Sécuriser dateOp
+            if "dateOp" in df.columns:
+                df["dateOp"] = pd.to_datetime(df["dateOp"], errors="coerce")
+
+            # Sécuriser dateOp_str
+            if "dateOp_str" not in df.columns and "dateOp" in df.columns:
+                df["dateOp_str"] = df["dateOp"].dt.strftime("%Y-%m")
+
+            # Sécuriser supplierFound
+            if "supplierFound" not in df.columns:
+                df["supplierFound"] = ""
+
+            return df
+
+        except Exception as e:
             return pd.DataFrame()
+
     return pd.DataFrame()
+
 
 def save_transactions():
     """Sauvegarde les transactions"""
@@ -311,7 +327,7 @@ def calculate_stats(df, selected_month=None):
     total_income = income['amount'].sum()
     
     # Par catégorie
-    expenses['category_final'] = expenses['autoCategory'].fillna(expenses['category'])
+    expenses['category_final'] = expenses['autoCategory']
     by_category = expenses.groupby('category_final')['amount'].sum().abs().to_dict()
     
     # Statistiques supplémentaires
@@ -348,15 +364,12 @@ def calculate_stats(df, selected_month=None):
     }
 
 def get_month_comparison(df):
-    """Compare les statistiques entre mois"""
     if df.empty:
         return pd.DataFrame()
-    
-    df['month'] = df['dateOp_str']
 
-    
     monthly_stats = []
-    for month in sorted(df['month'].unique()):
+
+    for month in sorted(df['dateOp_str'].dropna().unique()):
         stats = calculate_stats(df, month)
         monthly_stats.append({
             'Mois': datetime.strptime(month, "%Y-%m").strftime("%B %Y"),
@@ -366,8 +379,9 @@ def get_month_comparison(df):
             'Solde': stats['balance'],
             'Épargne': stats['net_savings']
         })
-    
+
     return pd.DataFrame(monthly_stats)
+
 
 def export_to_excel():
     """Exporte vers Excel"""
