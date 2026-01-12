@@ -1,0 +1,28 @@
+{
+  "Alimentation": [
+    "carrefour", "leclerc", "intermarché", "auchan", "lidl", "aldi",
+    "super u", "monoprix", "picard", "thiriet", "grand frais"
+  ],
+  "Restaurants & Bars": [
+    "restaurant", "brasserie", "bistrot", "kebab", "pizzeria",
+    "mcdonald", "burger", "kfc", "subway"
+  ],
+  "Achats en ligne": [
+    "amazon", "cdiscount", "fnac", "darty", "manomano", "aliexpress"
+  ],
+  "Banque & Paiements": [
+    "paypal", "revolut", "stripe", "sumup"
+  ],
+  "Abonnements & Loisirs": [
+    "netflix", "spotify", "canal", "prime video", "disney"
+  ],
+  "Transport": [
+    "sncf", "ratp", "uber", "bolt", "taxi", "péage", "vinci"
+  ],
+  "Santé": [
+    "pharmacie", "doctolib", "dentiste", "opticien"
+  ],
+  "Télécommunications": [
+    "orange", "sfr", "free", "bouygues", "sosh"
+  ]
+}
