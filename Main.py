@@ -581,59 +581,71 @@ if not st.session_state.all_transactions.empty:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# Sidebar
+# ========================================
+# SIDEBAR
+# ========================================
 with st.sidebar:
+
+    # --------------------
+    # Navigation
+    # --------------------
     st.markdown("## Navigation")
     page = st.radio(
         "",
         ["Tableau de bord", "Évolution", "Transactions", "Catégories", "Budgets", "Import CSV"],
         label_visibility="collapsed"
     )
-    
+
     st.markdown("---")
-    
+
+    # --------------------
+    # Statistiques globales
+    # --------------------
     if not st.session_state.all_transactions.empty:
         st.markdown("## Statistiques globales")
+
         total_trans = len(st.session_state.all_transactions)
         total_rules = len(st.session_state.rules)
-        months = st.session_state.all_transactions['dateOp_str'].nunique()
-        
+        months = st.session_state.all_transactions["dateOp_str"].nunique()
+
         st.metric("Transactions", total_trans)
         st.metric("Règles actives", total_rules)
         st.metric("Mois", months)
-        st.markdown("---")
-
-if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=True):
-    if st.session_state.all_transactions.empty:
-        st.warning("Aucune transaction à recatégoriser.")
-    else:
-        with st.spinner("Recatégorisation en cours..."):
-            recategorize_all()
-        st.success("Toutes les transactions ont été recatégorisées.")
-        st.rerun()
 
         st.markdown("---")
-        # Détection des doublons
-if not st.session_state.all_transactions.empty:
-    tmp_ids = (
-        st.session_state.all_transactions
-        .apply(generate_transaction_id, axis=1)
-    )
 
-    has_duplicates = tmp_ids.duplicated().any()
-
-    if has_duplicates:
-        st.markdown("---")
-        if st.button("🧹 Supprimer les doublons", use_container_width=True):
-            removed = remove_duplicates()
-            st.success(f"{removed} doublon(s) supprimé(s)")
+        # --------------------
+        # Actions globales
+        # --------------------
+        if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=True):
+            with st.spinner("Recatégorisation en cours..."):
+                recategorize_all()
+            st.success("Toutes les transactions ont été recatégorisées.")
             st.rerun()
 
-        
+        # --------------------
+        # Détection & suppression des doublons (DISCRET)
+        # --------------------
+        tmp_ids = st.session_state.all_transactions.apply(
+            generate_transaction_id, axis=1
+        )
+        has_duplicates = tmp_ids.duplicated().any()
+
+        if has_duplicates:
+            if st.button("🧹 Supprimer les doublons", use_container_width=True):
+                removed = remove_duplicates()
+                st.success(f"{removed} doublon(s) supprimé(s)")
+                st.rerun()
+
+        st.markdown("---")
+
+        # --------------------
+        # Export
+        # --------------------
         if st.button("Exporter Excel", use_container_width=True):
             excel_file = export_to_excel()
             if excel_file:
-                with open(excel_file, 'rb') as f:
+                with open(excel_file, "rb") as f:
                     st.download_button(
                         "Télécharger",
                         f,
@@ -641,11 +653,16 @@ if not st.session_state.all_transactions.empty:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
-    
+
     st.markdown("---")
+
+    # --------------------
+    # Déconnexion
+    # --------------------
     if st.button("Déconnexion", type="secondary", use_container_width=True):
         st.session_state.authenticated = False
         st.rerun()
+
 
 # ========================================
 # PAGE: TABLEAU DE BORD
