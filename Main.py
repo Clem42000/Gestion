@@ -767,57 +767,56 @@ elif page == "Transactions":
 # ========================================
 elif page == "Catégories":
     st.header("Règles de catégorisation")
-    
+
     st.markdown("""
     <div class="info-box">
         Les règles permettent de catégoriser automatiquement vos transactions.
         Si le libellé contient le mot-clé, la transaction sera classée dans la catégorie définie.
     </div>
     """, unsafe_allow_html=True)
-    
-    # Formulaire d'ajout
+
+    # Formulaire d'ajout de règle
     col1, col2, col3 = st.columns(3)
 
-# Formulaire d'ajout de règle
-with col1:
-    new_keyword = st.text_input("Mot-clé (ex: Colruyt)", key="new_keyword")
-with col2:
-    new_category = st.text_input("Catégorie (ex: Alimentation)", key="new_category")
-with col3:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Ajouter la règle", key="add_rule"):
-        if new_keyword and new_category:
-            st.session_state.rules.append({
-                "keyword": new_keyword,
-                "category": new_category
-            })
+    with col1:
+        new_keyword = st.text_input("Mot-clé (ex: Colruyt)", key="new_keyword")
+    with col2:
+        new_category = st.text_input("Catégorie (ex: Alimentation)", key="new_category")
+    with col3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Ajouter la règle", key="add_rule"):
+            if new_keyword and new_category:
+                st.session_state.rules.append({
+                    "keyword": new_keyword,
+                    "category": new_category
+                })
+                save_rules()
+                st.success(f"Règle ajoutée : '{new_keyword}' → '{new_category}'")
+            else:
+                st.warning("Veuillez remplir tous les champs.")
+
+    # Afficher les règles existantes
+    st.markdown("### Règles existantes")
+    if st.session_state.rules:
+        rules_df = pd.DataFrame(st.session_state.rules)
+        st.dataframe(rules_df, use_container_width=True)
+
+        # Supprimer une règle
+        st.markdown("### Supprimer une règle")
+        rule_to_delete = st.selectbox(
+            "Sélectionner une règle à supprimer",
+            options=[f"{rule['keyword']} → {rule['category']}" for rule in st.session_state.rules],
+            index=0,
+            key="rule_to_delete"
+        )
+
+        if st.button("Supprimer la règle", key="delete_rule"):
+            keyword_to_delete = rule_to_delete.split(" → ")[0]
+            st.session_state.rules = [rule for rule in st.session_state.rules if rule["keyword"] != keyword_to_delete]
             save_rules()
-            st.success(f"Règle ajoutée : '{new_keyword}' → '{new_category}'")
-        else:
-            st.warning("Veuillez remplir tous les champs.")
-
-# Afficher les règles existantes
-st.markdown("### Règles existantes")
-if st.session_state.rules:
-    rules_df = pd.DataFrame(st.session_state.rules)
-    st.dataframe(rules_df, use_container_width=True)
-
-    # Supprimer une règle
-    st.markdown("### Supprimer une règle")
-    rule_to_delete = st.selectbox(
-        "Sélectionner une règle à supprimer",
-        options=[f"{rule['keyword']} → {rule['category']}" for rule in st.session_state.rules],
-        index=0,
-        key="rule_to_delete"
-    )
-
-    if st.button("Supprimer la règle", key="delete_rule"):
-        keyword_to_delete = rule_to_delete.split(" → ")[0]
-        st.session_state.rules = [rule for rule in st.session_state.rules if rule["keyword"] != keyword_to_delete]
-        save_rules()
-        st.success(f"Règle supprimée : '{keyword_to_delete}'")
-else:
-    st.info("Aucune règle définie. Ajoutez-en une ci-dessus.")
+            st.success(f"Règle supprimée : '{keyword_to_delete}'")
+    else:
+        st.info("Aucune règle définie. Ajoutez-en une ci-dessus.")
 
 
 # ========================================
