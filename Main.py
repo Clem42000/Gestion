@@ -213,6 +213,12 @@ def load_transactions():
 
             # Sécurité ultime : suppression des doublons existants
             df = df.drop_duplicates(subset=["transaction_id"]).reset_index(drop=True)
+            
+            # Recatégorisation automatique si logique mise à jour
+            df["autoCategory"] = df.apply(
+                lambda row: categorize_transaction(row, st.session_state.rules),
+                axis=1
+            )
 
             return df
 
@@ -554,7 +560,17 @@ with st.sidebar:
         st.metric("Transactions", total_trans)
         st.metric("Règles actives", total_rules)
         st.metric("Mois", months)
-        
+        st.markdown("---")
+
+if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=True):
+    if st.session_state.all_transactions.empty:
+        st.warning("Aucune transaction à recatégoriser.")
+    else:
+        with st.spinner("Recatégorisation en cours..."):
+            recategorize_all()
+        st.success("Toutes les transactions ont été recatégorisées.")
+        st.rerun()
+
         st.markdown("---")
         
         if st.button("Exporter Excel", use_container_width=True):
