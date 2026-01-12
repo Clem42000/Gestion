@@ -598,9 +598,9 @@ if not st.session_state.all_transactions.empty:
 # ========================================
 with st.sidebar:
 
-    # --------------------
+    # ===============================
     # Navigation
-    # --------------------
+    # ===============================
     st.markdown("## Navigation")
     page = st.radio(
         "",
@@ -610,9 +610,9 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # --------------------
+    # ===============================
     # Statistiques globales
-    # --------------------
+    # ===============================
     if not st.session_state.all_transactions.empty:
         st.markdown("## Statistiques globales")
 
@@ -626,62 +626,61 @@ with st.sidebar:
 
         st.markdown("---")
 
-        # --------------------
+        # ===============================
         # Actions globales
-        # --------------------
+        # ===============================
+        st.markdown("## Actions")
+
         if st.button("🔄 Recatégoriser toutes les transactions", use_container_width=True):
             with st.spinner("Recatégorisation en cours..."):
                 recategorize_all()
-            st.success("Toutes les transactions ont été recatégorisées.")
+            st.success("Recatégorisation terminée.")
             st.rerun()
 
-        # --------------------
-        # Détection & suppression des doublons (DISCRET)
-        # --------------------
-        tmp_ids = st.session_state.all_transactions.apply(
-            generate_transaction_id, axis=1
-        )
-        has_duplicates = tmp_ids.duplicated().any()
-
-        if has_duplicates:
-            if st.button("🧹 Supprimer les doublons", use_container_width=True):
-                removed = remove_duplicates()
-                st.success(f"{removed} doublon(s) supprimé(s)")
-                st.rerun()
-
-        st.markdown("---")
-
-        # --------------------
-        # Export
-        # --------------------
-        if st.button("Exporter Excel", use_container_width=True):
+        if st.button("📤 Exporter Excel", use_container_width=True):
             excel_file = export_to_excel()
             if excel_file:
                 with open(excel_file, "rb") as f:
                     st.download_button(
-                        "Télécharger",
+                        "Télécharger le fichier",
                         f,
                         file_name=excel_file,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
 
+        st.markdown("---")
+
+        # ===============================
+        # Maintenance (discrète)
+        # ===============================
+        with st.expander("🛠 Maintenance"):
+            # Nettoyage doublons
+            if st.button("🧹 Supprimer les doublons", use_container_width=True):
+                removed = remove_duplicates()
+                if removed == 0:
+                    st.info("Aucun doublon détecté.")
+                else:
+                    st.success(f"{removed} doublon(s) supprimé(s).")
+                st.rerun()
+
+            # Nettoyage transactions invalides
+            if st.button("🧹 Supprimer les transactions sans date", use_container_width=True):
+                removed = remove_invalid_transactions()
+                if removed == 0:
+                    st.info("Aucune transaction invalide.")
+                else:
+                    st.success(f"{removed} transaction(s) supprimée(s).")
+                st.rerun()
+
     st.markdown("---")
 
-    # --------------------
+    # ===============================
     # Déconnexion
-    # --------------------
+    # ===============================
     if st.button("Déconnexion", type="secondary", use_container_width=True):
         st.session_state.authenticated = False
         st.rerun()
-with st.expander("Maintenance"):
-    if st.button("🧹 Supprimer les transactions sans date"):
-        removed = remove_invalid_transactions()
-        if removed == 0:
-            st.info("Aucune transaction invalide détectée.")
-        else:
-            st.success(f"{removed} transaction(s) supprimée(s).")
-            st.rerun()
 
 
 # ========================================
