@@ -421,14 +421,28 @@ def calculate_stats(df, selected_month=None):
 
 
     
-    # Mouvements internes
-    internal = df[df['autoCategory'] == 'Mouvement interne']
-    savings_in = abs(internal[internal['amount'] < 0]['amount'].sum())
-    savings_out = internal[internal['amount'] > 0]['amount'].sum()
-    net_savings = savings_in - savings_out
+# ===============================
+# ÉPARGNE (LIVRET A)
+# ===============================
+savings_in = abs(
+    df[df["autoCategory"] == "Épargne (versement)"]["amount"].sum()
+)
+
+savings_out = abs(
+    df[df["autoCategory"] == "Épargne (retrait)"]["amount"].sum()
+)
+
+net_savings = savings_in - savings_out
+
     
     # Revenus et dépenses (hors mouvements internes)
-    df_filtered = df[df['autoCategory'] != 'Mouvement interne']
+    df_filtered = df[
+        ~df['autoCategory'].isin([
+            "Mouvement interne",
+            "Épargne (versement)",
+            "Épargne (retrait)"
+        ])
+    ]
     
     expenses = df_filtered[df_filtered['amount'] < 0].copy()
     income = df_filtered[df_filtered['amount'] > 0].copy()
