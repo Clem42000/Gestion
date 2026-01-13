@@ -436,13 +436,14 @@ net_savings = savings_in - savings_out
 
     
     # Revenus et dépenses (hors mouvements internes)
-    df_filtered = df[
-        ~df['autoCategory'].isin([
-            "Mouvement interne",
-            "Épargne (versement)",
-            "Épargne (retrait)"
-        ])
-    ]
+df_filtered = df[
+    ~df['autoCategory'].isin([
+        "Mouvement interne",
+        "Épargne (versement)",
+        "Épargne (retrait)"
+    ])
+]
+
     
     expenses = df_filtered[df_filtered['amount'] < 0].copy()
     income = df_filtered[df_filtered['amount'] > 0].copy()
