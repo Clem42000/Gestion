@@ -402,91 +402,97 @@ def recategorize_all():
 
 def calculate_stats(df, selected_month=None):
     """Calcule les statistiques"""
+
     if df.empty:
         return {
-            'total_expenses': 0,
-            'total_income': 0,
-            'balance': 0,
-            'by_category': {},
-            'savings_in': 0,
-            'savings_out': 0,
-            'net_savings': 0,
-            'avg_daily_expense': 0,
-            'largest_expense': {'label': '', 'amount': 0},
-            'expense_count': 0
+            "total_expenses": 0,
+            "total_income": 0,
+            "balance": 0,
+            "by_category": {},
+            "savings_in": 0,
+            "savings_out": 0,
+            "net_savings": 0,
+            "avg_daily_expense": 0,
+            "largest_expense": {"label": "", "amount": 0},
+            "expense_count": 0,
         }
-    
+
     if selected_month and selected_month != "Tous les mois":
         df = df[df["dateOp_str"] == selected_month]
 
+    # ===============================
+    # ÉPARGNE (LIVRET A)
+    # ===============================
+    savings_in = abs(
+        df[df["autoCategory"] == "Épargne (versement)"]["amount"].sum()
+    )
 
-    
-# ===============================
-# ÉPARGNE (LIVRET A)
-# ===============================
-savings_in = abs(
-    df[df["autoCategory"] == "Épargne (versement)"]["amount"].sum()
-)
+    savings_out = abs(
+        df[df["autoCategory"] == "Épargne (retrait)"]["amount"].sum()
+    )
 
-savings_out = abs(
-    df[df["autoCategory"] == "Épargne (retrait)"]["amount"].sum()
-)
+    net_savings = savings_in - savings_out
 
-net_savings = savings_in - savings_out
-
-    
-    # Revenus et dépenses (hors mouvements internes)
-        df_filtered = df[
-            ~df['autoCategory'].isin([
+    # ===============================
+    # REVENUS / DÉPENSES (hors épargne)
+    # ===============================
+    df_filtered = df[
+        ~df["autoCategory"].isin(
+            [
                 "Mouvement interne",
                 "Épargne (versement)",
-                "Épargne (retrait)"
-            ])
-        ]
+                "Épargne (retrait)",
+            ]
+        )
+    ]
 
-    
-    expenses = df_filtered[df_filtered['amount'] < 0].copy()
-    income = df_filtered[df_filtered['amount'] > 0].copy()
-    
-    total_expenses = abs(expenses['amount'].sum())
-    total_income = income['amount'].sum()
-    
+    expenses = df_filtered[df_filtered["amount"] < 0].copy()
+    income = df_filtered[df_filtered["amount"] > 0].copy()
+
+    total_expenses = abs(expenses["amount"].sum())
+    total_income = income["amount"].sum()
+
     # Par catégorie
-    expenses['category_final'] = expenses['autoCategory']
-    by_category = expenses.groupby('category_final')['amount'].sum().abs().to_dict()
-    
+    expenses["category_final"] = expenses["autoCategory"]
+    by_category = (
+        expenses.groupby("category_final")["amount"].sum().abs().to_dict()
+    )
+
     # Statistiques supplémentaires
     expense_count = len(expenses)
-    
+
     # Dépense moyenne par jour
     if not expenses.empty and selected_month and selected_month != "Tous les mois":
-        days_in_month = pd.to_datetime(expenses['dateOp']).dt.day.max()
-        avg_daily_expense = total_expenses / days_in_month if days_in_month > 0 else 0
+        days_in_month = pd.to_datetime(expenses["dateOp"]).dt.day.max()
+        avg_daily_expense = (
+            total_expenses / days_in_month if days_in_month > 0 else 0
+        )
     else:
         avg_daily_expense = 0
-    
+
     # Plus grosse dépense
     if not expenses.empty:
-        largest_idx = expenses['amount'].abs().idxmax()
+        largest_idx = expenses["amount"].abs().idxmax()
         largest_expense = {
-            'label': expenses.loc[largest_idx, 'label'],
-            'amount': abs(expenses.loc[largest_idx, 'amount'])
+            "label": expenses.loc[largest_idx, "label"],
+            "amount": abs(expenses.loc[largest_idx, "amount"]),
         }
     else:
-        largest_expense = {'label': '', 'amount': 0}
-    
+        largest_expense = {"label": "", "amount": 0}
+
     return {
-        'total_expenses': total_expenses,
-        'total_income': total_income,
-        'balance': total_income - total_expenses,
-        'by_category': by_category,
-        'savings_in': savings_in,
-        'savings_out': savings_out,
-        'net_savings': net_savings,
-        'avg_daily_expense': avg_daily_expense,
-        'largest_expense': largest_expense,
-        'expense_count': expense_count
+        "total_expenses": total_expenses,
+        "total_income": total_income,
+        "balance": total_income - total_expenses,
+        "by_category": by_category,
+        "savings_in": savings_in,
+        "savings_out": savings_out,
+        "net_savings": net_savings,
+        "avg_daily_expense": avg_daily_expense,
+        "largest_expense": largest_expense,
+        "expense_count": expense_count,
     }
+
 
 def get_month_comparison(df):
     if df.empty:
