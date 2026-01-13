@@ -279,54 +279,61 @@ def categorize_transaction(row, rules):
         amount = row.get("amount", 0)
         text = f"{supplier} {label}"
 
-        # ===============================
-        # 1️⃣ VIREMENTS / SALAIRES / REMBOURSEMENTS
-        # ===============================
-        if "vir" in text or "virement" in text:
-
-            # ---- VIREMENTS INTERNES (épargne / comptes perso)
-            internal_keywords = [
-                "depuis livret",
-                "vers livret",
-                "livret a",
-                "livret",
-                "epargne",
-                "compte interne",
-                "mouvements internes"
-            ]
-            if any(k in text for k in internal_keywords):
-                return "Mouvement interne"
-
-            # ---- SALAIRES
-            salary_keywords = [
-                "salaire",
-                "payroll",
-                "paie",
-                "payement salaire",
-                "traitement",
-                "remuneration"
-            ]
-            if any(k in text for k in salary_keywords) and amount > 0:
-                return "Salaire"
-
-            # ---- REMBOURSEMENTS
-            refund_keywords = [
-                "remboursement",
-                "rembours",
-                "indemnite",
-                "indemnisation",
-                "assurance",
-                "cpam",
-                "mutuelle"
-            ]
-            if any(k in text for k in refund_keywords) and amount > 0:
-                return "Remboursement"
-
-            # ---- VIREMENTS EXTERNES
-            if amount > 0:
-                return "Virement entrant"
-            else:
-                return "Virement sortant"
+    # ===============================
+    # 1️⃣ VIREMENTS & ÉPARGNE (PRIORITÉ ABSOLUE)
+    # ===============================
+    if "vir" in text or "virement" in text:
+    
+        # ---- ÉPARGNE : COMPTE COURANT → LIVRET A
+        if (
+            "boursobank" in text
+            and "livret a" not in text
+            and amount < 0
+        ):
+            return "Épargne (versement)"
+    
+        # ---- DÉSÉPARGNE : LIVRET A → COMPTE COURANT
+        if (
+            "livret a" in text
+            and amount > 0
+        ):
+            return "Épargne (retrait)"
+    
+        # ---- AUTRES VIREMENTS INTERNES
+        internal_keywords = [
+            "epargne",
+            "compte interne",
+            "mouvements internes",
+            "virement interne"
+        ]
+        if any(k in text for k in internal_keywords):
+            return "Mouvement interne"
+    
+        # ---- SALAIRES
+        salary_keywords = [
+            "salaire",
+            "paie",
+            "payroll",
+            "remuneration",
+            "traitement"
+        ]
+        if any(k in text for k in salary_keywords) and amount > 0:
+            return "Salaire"
+    
+        # ---- REMBOURSEMENTS
+        refund_keywords = [
+            "remboursement",
+            "indemnisation",
+            "assurance",
+            "cpam",
+            "mutuelle"
+        ]
+        if any(k in text for k in refund_keywords) and amount > 0:
+            return "Remboursement"
+    
+        # ---- VIREMENTS EXTERNES PAR DÉFAUT
+        return "Virement entrant" if amount > 0 else "Virement sortant"
+    
 
         # ===============================
         # 2️⃣ RÈGLES UTILISATEUR (PRIORITÉ MAX)
