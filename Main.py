@@ -279,71 +279,54 @@ def categorize_transaction(row, rules):
         amount = row.get("amount", 0)
         text = f"{supplier} {label}"
 
-    # ===============================
-    # 1️⃣ VIREMENTS & ÉPARGNE (PRIORITÉ ABSOLUE)
-    # ===============================
-    if "vir" in text or "virement" in text:
-    
-        # ---- ÉPARGNE : COMPTE COURANT → LIVRET A
-        if (
-            "boursobank" in text
-            and "livret a" not in text
-            and amount < 0
-        ):
-            return "Épargne (versement)"
-    
-        # ---- DÉSÉPARGNE : LIVRET A → COMPTE COURANT
-        if (
-            "livret a" in text
-            and amount > 0
-        ):
-            return "Épargne (retrait)"
-    
-        # ---- AUTRES VIREMENTS INTERNES
-        internal_keywords = [
-            "epargne",
-            "compte interne",
-            "mouvements internes",
-            "virement interne"
-        ]
-        if any(k in text for k in internal_keywords):
-            return "Mouvement interne"
-    
-        # ---- SALAIRES
-        salary_keywords = [
-            "salaire",
-            "paie",
-            "payroll",
-            "remuneration",
-            "traitement"
-        ]
-        if any(k in text for k in salary_keywords) and amount > 0:
-            return "Salaire"
-    
-        # ---- REMBOURSEMENTS
-        refund_keywords = [
-            "remboursement",
-            "indemnisation",
-            "assurance",
-            "cpam",
-            "mutuelle"
-        ]
-        if any(k in text for k in refund_keywords) and amount > 0:
-            return "Remboursement"
-    
-        # ---- VIREMENTS EXTERNES PAR DÉFAUT
-        return "Virement entrant" if amount > 0 else "Virement sortant"
-    
+        # ===============================
+        # 1️⃣ ÉPARGNE / VIREMENTS INTERNES (PRIORITÉ ABSOLUE)
+        # ===============================
+        if "vir" in text or "virement" in text:
+
+            # ---- ÉPARGNE : COMPTE COURANT → LIVRET A
+            if (
+                "boursobank" in text
+                and "livret a" not in text
+                and amount < 0
+            ):
+                return "Épargne (versement)"
+
+            # ---- DÉSÉPARGNE : LIVRET A → COMPTE COURANT
+            if (
+                "livret a" in text
+                and amount > 0
+            ):
+                return "Épargne (retrait)"
+
+            # ---- SALAIRES
+            salary_keywords = [
+                "salaire", "paie", "payroll",
+                "remuneration", "traitement"
+            ]
+            if any(k in text for k in salary_keywords) and amount > 0:
+                return "Salaire"
+
+            # ---- REMBOURSEMENTS
+            refund_keywords = [
+                "remboursement", "indemnisation",
+                "assurance", "cpam", "mutuelle"
+            ]
+            if any(k in text for k in refund_keywords) and amount > 0:
+                return "Remboursement"
+
+            # ---- AUTRES VIREMENTS
+            return "Virement entrant" if amount > 0 else "Virement sortant"
 
         # ===============================
-        # 2️⃣ RÈGLES UTILISATEUR (PRIORITÉ MAX)
+        # 2️⃣ RÈGLES UTILISATEUR
         # ===============================
         for rule in rules:
             if rule["keyword"].lower() in text:
                 return rule["category"]
 
         # ===============================
-        # 3️⃣ RÈGLES AUTOMATIQUES (auto_rules.json)
+        # 3️⃣ RÈGLES AUTOMATIQUES
         # ===============================
         for category, keywords in st.session_state.auto_rules.items():
             if any(k in text for k in keywords):
@@ -351,10 +334,8 @@ def categorize_transaction(row, rules):
 
         return "Divers"
 
-    except Exception:
+    except Exception as e:
         return "Erreur catégorisation"
-
-
 
 def parse_csv(uploaded_file):
     """Parse le CSV de Boursorama"""
